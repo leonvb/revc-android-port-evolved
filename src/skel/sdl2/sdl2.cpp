@@ -1052,6 +1052,8 @@ void InitialiseLanguage()
  *****************************************************************************
  */
 
+void inputEventHandler();
+
 void HandleExit()
 {
     inputEventHandler();
