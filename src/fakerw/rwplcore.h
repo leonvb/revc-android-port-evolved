@@ -484,6 +484,8 @@ RwInt32 RwEngineGetNumVideoModes(void);
 RwVideoMode *RwEngineGetVideoModeInfo(RwVideoMode *modeinfo, RwInt32 modeIndex);
 RwInt32 RwEngineGetCurrentVideoMode(void);
 RwBool RwEngineSetVideoMode(RwInt32 modeIndex);
+RwInt32 RwEngineGetRenderScale(void);
+RwBool RwEngineSetRenderScale(RwInt32 percent);
 RwInt32 RwEngineGetTextureMemorySize(void);
 RwInt32 RwEngineGetMaxTextureSize(void);
 
