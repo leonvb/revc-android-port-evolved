@@ -54,9 +54,13 @@ HANDLE FindFirstFile(const char* pathname, WIN32_FIND_DATA* firstfile) {
     if (realFolder)
         free(realFolder);
 
-	HANDLE d;
-	if ((d = (HANDLE)opendir(firstfile->folder)) == NULL || !FindNextFile(d, firstfile))
-		return NULL;
+	HANDLE d = (HANDLE)opendir(firstfile->folder);
+	if (d == NULL)
+		return INVALID_HANDLE_VALUE;
+	if (!FindNextFile(d, firstfile)) {
+		closedir((DIR*)d);
+		return INVALID_HANDLE_VALUE;
+	}
 
 	return d;
 }
@@ -226,10 +230,16 @@ char* casepath(char const* path, bool checkPathFirst)
         pos += strlen(CFileMgr::GetRootDirName());
         p = pos;
     }
-    d = opendir(cwd);
-    out[0] = '.';
-    out[1] = 0;
-    rl = 1;
+    if (p[0] == '/' && (strncmp(p, "/storage/", 9) == 0 || strncmp(p, "/sdcard/", 8) == 0 || strncmp(p, "/data/", 6) == 0)) {
+        d = opendir("/");
+        out[0] = 0;
+        rl = 0;
+    } else {
+        d = opendir(cwd);
+        out[0] = '.';
+        out[1] = 0;
+        rl = 1;
+    }
 #else
     if (p[0] == '/' || p[0] == '\\')
     {

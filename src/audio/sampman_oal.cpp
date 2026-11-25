@@ -930,6 +930,9 @@ cSampleManager::Initialise(void)
 
 		for ( int32 i = 0; i < TOTAL_STREAMED_SOUNDS; i++ )
 		{	
+#ifdef LIBRW_SDL2
+			SDL_PumpEvents();
+#endif
 			if ( aStream[0] && (
 #ifdef PS2_AUDIO_PATHS
 				aStream[0]->Open(PS2StreamedNameTable[i], IsThisTrackAt16KHz(i) ? 16000 : 32000) || 
@@ -941,7 +944,11 @@ cSampleManager::Initialise(void)
 				
 				nStreamLength[i] = tatalms;
 			} else
+#if defined ANDROID
+				debug("SampleManager: Can't open '%s'\n", StreamedNameTable[i]);
+#else
 				USERERROR("Can't open '%s'\n", StreamedNameTable[i]);
+#endif
 		}
 #ifdef AUDIO_CACHE
 		cacheFile = fcaseopen("audio\\sound.cache", "wb");

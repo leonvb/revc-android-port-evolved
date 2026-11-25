@@ -1631,9 +1631,12 @@ static struct {
 	int gl;
 	int major, minor;
 } profiles[] = {
+#ifndef ANDROID
 	{ SDL_GL_CONTEXT_PROFILE_CORE, 3, 3 },
 	{ SDL_GL_CONTEXT_PROFILE_CORE, 2, 1 },
+#endif
 	{ SDL_GL_CONTEXT_PROFILE_ES, 3, 1 },
+	{ SDL_GL_CONTEXT_PROFILE_ES, 3, 0 },
 	{ SDL_GL_CONTEXT_PROFILE_ES, 2, 0 },
 	{ 0, 0, 0 },
 };
@@ -1641,8 +1644,8 @@ static struct {
 static int
 startSDL2(void)
 {
-	SDL_Window *win;
-	SDL_GLContext ctx;
+	SDL_Window *win = nil;
+	SDL_GLContext ctx = nil;
 	DisplayMode *mode;
 
 	mode = &glGlobals.modes[glGlobals.currentMode];
@@ -1665,16 +1668,20 @@ startSDL2(void)
 				SDL_SetWindowDisplayMode(win, NULL);
 		}
 		if(win){
-			gl3Caps.gles = profiles[i].gl == SDL_GL_CONTEXT_PROFILE_ES;
-			gl3Caps.glversion = profiles[i].major*10 + profiles[i].minor;
-			break;
+			ctx = SDL_GL_CreateContext(win);
+			if(ctx){
+				gl3Caps.gles = profiles[i].gl == SDL_GL_CONTEXT_PROFILE_ES;
+				gl3Caps.glversion = profiles[i].major*10 + profiles[i].minor;
+				break;
+			}
+			SDL_DestroyWindow(win);
+			win = nil;
 		}
 	}
-	if(win == nil){
+	if(win == nil || ctx == nil){
 		RWERROR((ERR_GENERAL, SDL_GetError()));
 		return 0;
 	}
-	ctx = SDL_GL_CreateContext(win);
 
 	if (!((gl3Caps.gles ? gladLoadGLES2Loader : gladLoadGLLoader) ((GLADloadproc) SDL_GL_GetProcAddress, gl3Caps.glversion)) ) {
 		RWERROR((ERR_GENERAL, "gladLoadGLLoader failed"));

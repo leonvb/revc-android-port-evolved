@@ -11,8 +11,8 @@ android {
         applicationId "com.revc.game"
         minSdk 24
         targetSdk 35
-        versionCode 12
-        versionName "1.0.11"
+        versionCode 13
+        versionName "1.0.12"
 
         ndkVersion '27.2.12479018'
 
@@ -108,6 +108,35 @@ android {
         main {
             jniLibs.srcDir 'jniLibs'
         }
+    }
+}
+
+abstract class SyncRevcGameFilesTask extends DefaultTask {
+    @InputDirectory
+    abstract DirectoryProperty getInputDir()
+
+    @OutputDirectory
+    abstract DirectoryProperty getOutputDir()
+
+    @TaskAction
+    void syncFiles() {
+        project.delete(outputDir.get().asFile)
+        project.copy {
+            from(inputDir)
+            exclude('gamecontrollerdb.txt')
+            into(new File(outputDir.get().asFile, 'gamefiles'))
+        }
+    }
+}
+
+def syncRevcGameFiles = tasks.register('syncRevcGameFiles', SyncRevcGameFilesTask) {
+    inputDir.set(rootProject.layout.projectDirectory.dir('../../gamefiles'))
+    outputDir.set(layout.buildDirectory.dir('generated/revcAssets'))
+}
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.sources.assets.addGeneratedSourceDirectory(syncRevcGameFiles, SyncRevcGameFilesTask.&getOutputDir)
     }
 }
 
