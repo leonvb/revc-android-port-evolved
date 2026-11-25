@@ -11,8 +11,8 @@ android {
         applicationId "com.revc.game"
         minSdk 24
         targetSdk 35
-        versionCode 12
-        versionName "1.0.11"
+        versionCode 13
+        versionName "1.0.12"
 
         ndkVersion '27.2.12479018'
 
@@ -104,10 +104,21 @@ android {
         buildConfig = true
     }
 
+    def syncRevcGameFiles = tasks.register('syncRevcGameFiles', Copy) {
+        from rootProject.file('../../gamefiles')
+        exclude 'gamecontrollerdb.txt'
+        into layout.buildDirectory.dir('generated/revcAssets/gamefiles')
+    }
+
     sourceSets {
         main {
             jniLibs.srcDir 'jniLibs'
+            assets.srcDirs = ['src/main/assets', layout.buildDirectory.dir('generated/revcAssets')]
         }
+    }
+
+    tasks.named('preBuild').configure {
+        dependsOn(syncRevcGameFiles)
     }
 }
 

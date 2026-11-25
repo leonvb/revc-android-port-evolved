@@ -78,10 +78,24 @@ CText::Load(void)
 	}
 
 	file = CFileMgr::OpenFile(filename, "rb");
+	if (!file && strcmp(filename, "AMERICAN.GXT") != 0) {
+		debug("CText::Load: '%s' not found, falling back to AMERICAN.GXT\n", filename);
+		sprintf(filename, "AMERICAN.GXT");
+		encoding = 'e';
+		file = CFileMgr::OpenFile(filename, "rb");
+	}
+	if (!file) {
+		debug("CText::Load: Failed to open '%s'\n", filename);
+		CFileMgr::SetDir("");
+		return;
+	}
 
 	offset = 0;
 	while (!tkey_loaded || !tdat_loaded) {
+		memset(&m_ChunkHeader, 0, sizeof(m_ChunkHeader));
 		ReadChunkHeader(&m_ChunkHeader, file, &offset);
+		if (CFileMgr::GetErrorReadWrite(file))
+			break;
 		if (m_ChunkHeader.size != 0) {
 			if (strncmp(m_ChunkHeader.magic, "TABL", 4) == 0) {
 				MissionTextOffsets.Load(m_ChunkHeader.size, file, &offset, 0x58000);

@@ -35,6 +35,7 @@ void ReadVideoCardCapsFile(uint32&, uint32&, uint32&, uint32&);
 bool CheckVideoCardCaps(void);
 void WriteVideoCardCapsFile(void);
 bool CanVideoCardDoDXT(void);
+bool VideoCardHasNativeS3TC(void);
 void ConvertingTexturesScreen(uint32, uint32, const char*);
 void DealWithTxdWriteError(uint32, uint32, const char*);
 bool CreateTxdImageForVideoCard();

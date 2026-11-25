@@ -19,7 +19,7 @@ uintptr_t g_libREVC = NULL;
 bool AndWrapper::AppInitialized = false;
 bool AndWrapper::AppStarted = false;
 
-JAVA_WRAPPER Java_org_libsdl_app_SDLActivity_nativeSetupJNI(JNIEnv* env, jobject initGame)
+JAVA_WRAPPER Java_com_revc_game_core_REVC_initJavaWrapper(JNIEnv* env, jobject initGame)
 {
     if(!javaVM) {
         env->GetJavaVM(&javaVM);

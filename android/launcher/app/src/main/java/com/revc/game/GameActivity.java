@@ -1,8 +1,10 @@
 package com.revc.game;
 
 import android.Manifest;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.AssetManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -47,6 +49,7 @@ public class GameActivity extends SDLActivity {
     public static final String GAME_FOLDER_NAME = BuildConfig.GAME_FOLDER_NAME;
 
     private static final int REQUEST_LEGACY_STORAGE_PERMISSION = 1001;
+    private boolean missingGameFiles = false;
 
     public static File getGameDir() {
         return new File(Environment.getExternalStorageDirectory(), GAME_FOLDER_NAME);
@@ -80,6 +83,20 @@ public class GameActivity extends SDLActivity {
         }
 
         ensureGameControllerDb(gameDir);
+        ensureBundledRevcFiles(gameDir);
+
+        if (!hasPcGameData(gameDir)) {
+            missingGameFiles = true;
+            new AlertDialog.Builder(this)
+                    .setTitle("GTA: Vice City files not found")
+                    .setMessage("Copy your PC Grand Theft Auto: Vice City game files (models/, data/, audio/, anim/, txd/, etc.) into:\n\n"
+                            + gameDir.getAbsolutePath()
+                            + "\n\n(Internal storage / " + GAME_FOLDER_NAME + ")\n\nand reopen reVC.")
+                    .setCancelable(false)
+                    .setPositiveButton("Exit", (d, which) -> finish())
+                    .show();
+            return;
+        }
 
         // Draw the game (and our touch controls) behind the camera cutout
         // consistently in landscape, instead of the system letterboxing
@@ -96,6 +113,22 @@ public class GameActivity extends SDLActivity {
         // native methods resolve fine without a separate System.loadLibrary.
         mLayout.addView(new TouchControlsView(this),
                 new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    }
+
+    @Override
+    protected void resumeNativeThread() {
+        if (missingGameFiles) {
+            return;
+        }
+        super.resumeNativeThread();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        if (missingGameFiles) {
+            return;
+        }
+        super.onWindowFocusChanged(hasFocus);
     }
 
     @Override
@@ -137,6 +170,85 @@ public class GameActivity extends SDLActivity {
             // reconocen, pero el juego sigue funcionando con los que sí
             // (y con los controles táctiles) igual.
         }
+    }
+
+    /**
+     * Extract bundled reVC-specific runtime files (gamefiles/ -> neo/, TEXT/,
+     * models/frontend_*.txd, etc.) into gameDir when missing, without
+     * overwriting files the user placed themselves.
+     */
+    private void ensureBundledRevcFiles(File gameDir) {
+        copyAssetTree(getAssets(), "gamefiles", gameDir);
+    }
+
+    private void copyAssetTree(AssetManager assets, String assetPath, File dstDir) {
+        String[] entries;
+        try {
+            entries = assets.list(assetPath);
+        } catch (IOException e) {
+            return;
+        }
+        if (entries == null || entries.length == 0) {
+            File existing = findCaseInsensitiveChild(dstDir.getParentFile(), dstDir.getName());
+            if (existing != null && existing.exists()) {
+                return;
+            }
+            File parent = dstDir.getParentFile();
+            if (parent != null && !parent.exists()) {
+                parent.mkdirs();
+            }
+            try (InputStream in = assets.open(assetPath);
+                 OutputStream out = new FileOutputStream(dstDir)) {
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            } catch (IOException ignored) {
+            }
+            return;
+        }
+
+        File targetDir = dstDir;
+        if (dstDir.getParentFile() != null && !"gamefiles".equals(assetPath)) {
+            File ciDir = findCaseInsensitiveChild(dstDir.getParentFile(), dstDir.getName());
+            if (ciDir != null && ciDir.isDirectory()) {
+                targetDir = ciDir;
+            }
+        }
+        if (!targetDir.exists()) {
+            targetDir.mkdirs();
+        }
+        for (String name : entries) {
+            copyAssetTree(assets, assetPath + "/" + name, new File(targetDir, name));
+        }
+    }
+
+    private File findCaseInsensitiveChild(File dir, String name) {
+        if (dir == null || !dir.isDirectory()) return null;
+        File exact = new File(dir, name);
+        if (exact.exists()) return exact;
+        File[] list = dir.listFiles();
+        if (list == null) return null;
+        for (File f : list) {
+            if (f.getName().equalsIgnoreCase(name)) {
+                return f;
+            }
+        }
+        return null;
+    }
+
+    private File resolvePathCaseInsensitive(File root, String... parts) {
+        File cur = root;
+        for (String part : parts) {
+            cur = findCaseInsensitiveChild(cur, part);
+            if (cur == null) return null;
+        }
+        return cur;
+    }
+
+    private boolean hasPcGameData(File gameDir) {
+        File gta3Img = resolvePathCaseInsensitive(gameDir, "models", "gta3.img");
+        File mainScm = resolvePathCaseInsensitive(gameDir, "data", "main.scm");
+        return gta3Img != null && gta3Img.isFile() && mainScm != null && mainScm.isFile();
     }
 
     private boolean hasFullStorageAccess() {
