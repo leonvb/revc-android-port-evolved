@@ -2,15 +2,17 @@ name: reVC Android
 
 on:
   push:
-    branches: [ "miami" ]
+    branches: [ "miami", "dev" ]
     paths:
       - 'android/launcher/**'
       - 'src/**'
+      - '.github/workflows/build-android.yml'
   pull_request:
-    branches: [ "miami" ]
+    branches: [ "miami", "dev" ]
     paths:
       - 'android/launcher/**'
       - 'src/**'
+      - '.github/workflows/build-android.yml'
   release:
     types: published 
 
