@@ -6,12 +6,16 @@ on:
     paths:
       - 'android/launcher/**'
       - 'src/**'
+      - 'vendor/**'
+      - 'cmake/**'
       - '.github/workflows/build-android.yml'
   pull_request:
     branches: [ "miami", "dev" ]
     paths:
       - 'android/launcher/**'
       - 'src/**'
+      - 'vendor/**'
+      - 'cmake/**'
       - '.github/workflows/build-android.yml'
   release:
     types: published 
