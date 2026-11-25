@@ -22,6 +22,10 @@ android {
             abiFilters "armeabi-v7a", "arm64-v8a"
         }
 
+        // Name of the game-files folder under internal storage (Environment.
+        // getExternalStorageDirectory()), read by GameActivity.GAME_FOLDER_NAME.
+        buildConfigField "String", "GAME_FOLDER_NAME", "\"reVC\""
+
         // This repo only ever builds the standard (unmodified) edition --
         // the Long Night edition, its own separate app, lives in
         // codepdbh/revc-long-night-experimental-port. TouchControlsView.java
