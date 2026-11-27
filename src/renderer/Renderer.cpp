@@ -1080,6 +1080,16 @@ CRenderer::ScanWorld(void)
 	vectors[CORNER_PRIO_RIGHT].x = vectors[CORNER_LOD_RIGHT].x * 0.2f;
 	vectors[CORNER_PRIO_RIGHT].y = vectors[CORNER_LOD_RIGHT].y * 0.2f;
 	vectors[CORNER_PRIO_RIGHT].z = vectors[CORNER_LOD_RIGHT].z;
+	float priorityScanDistance = LOD_DISTANCE;
+#if defined(MODERN_FEATURES) && defined(FIX_BUGS)
+	// Only the normal scan should reach the extended visual horizon. Keep the
+	// priority wedge at its Classic distance so nearby models get loaded first.
+	float modernLod = TheCamera.GetModernLodMultiplier();
+	float priorityScale = ModernVisualPolicy::PriorityLodDistance(1.0f, modernLod);
+	priorityScanDistance = ModernVisualPolicy::PriorityLodDistance(LOD_DISTANCE, modernLod);
+	vectors[CORNER_PRIO_LEFT] *= priorityScale;
+	vectors[CORNER_PRIO_RIGHT] *= priorityScale;
+#endif
 	RwV3dTransformPoints(vectors, vectors, 9, cammatrix);
 
 	m_loadingPriority = false;
@@ -1123,7 +1133,7 @@ CRenderer::ScanWorld(void)
 		}else
 #endif
 		{
-			if(f > LOD_DISTANCE){
+			if(f > priorityScanDistance){
 				// priority
 				poly[0].x = CWorld::GetSectorX(vectors[CORNER_CAM].x);
 				poly[0].y = CWorld::GetSectorY(vectors[CORNER_CAM].y);
@@ -1132,7 +1142,9 @@ CRenderer::ScanWorld(void)
 				poly[2].x = CWorld::GetSectorX(vectors[CORNER_PRIO_RIGHT].x);
 				poly[2].y = CWorld::GetSectorY(vectors[CORNER_PRIO_RIGHT].y);
 				ScanSectorPoly(poly, 3, ScanSectorList_Priority);
+			}
 
+			if(f > LOD_DISTANCE){
 				// below LOD
 				poly[0].x = CWorld::GetSectorX(vectors[CORNER_CAM].x);
 				poly[0].y = CWorld::GetSectorY(vectors[CORNER_CAM].y);

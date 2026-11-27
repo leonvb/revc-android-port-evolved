@@ -16,12 +16,14 @@ These tests cover disabled and water nodes, disconnected groups, road direction,
 c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g \
   tests/modern_visual_policy.cpp -o /tmp/modern_visual_policy
 /tmp/modern_visual_policy
+python3 tests/test_priority_scan_contract.py
 ```
 
 This exercises master-off and invalid-value behavior, scene eligibility,
-far-clip restoration decisions, alternating population horizons (including
-startup batches), distance bounds, and memory-budget calculations. It tests
-policy, not the actual camera, streaming, or population systems. Device
+far-clip restoration decisions, priority-distance scaling, alternating
+population horizons (including startup batches), distance bounds, and
+memory-budget calculations. The source-level priority scan guard checks the
+renderer wiring but does not simulate streaming or drawing. Device
 playtesting and visual inspection are still necessary.
 
 ## Experimental post-processing
