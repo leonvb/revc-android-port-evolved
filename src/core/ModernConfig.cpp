@@ -42,6 +42,7 @@ float CModernConfig::m_fMaxMantleHeight = 2.15f;
 float CModernConfig::m_fLodDistMultiplier = 1.0f;
 int8 CModernConfig::m_nNeonBloom = 0;
 int8 CModernConfig::m_bFxaa = 0;
+int8 CModernConfig::m_bExperimentalEdgeAA = 0;
 int8 CModernConfig::m_bDynamicPointLights = 0;
 int8 CModernConfig::m_bWetRoadReflections = 0;
 int8 CModernConfig::m_nRealtimeShadows = 0;
@@ -80,6 +81,7 @@ CModernConfig::ResetToClassicDefaults()
 	m_fLodDistMultiplier = 1.0f;
 	m_nNeonBloom = 0;
 	m_bFxaa = 0;
+	m_bExperimentalEdgeAA = 0;
 	m_bDynamicPointLights = 0;
 	m_bWetRoadReflections = 0;
 	m_nRealtimeShadows = 0;
@@ -131,6 +133,7 @@ CModernConfig::ApplyPreset(int8 preset)
 		m_fLodDistMultiplier = 2.2f;
 		m_nNeonBloom = 2;
 		m_bFxaa = 1;
+		m_bExperimentalEdgeAA = 0;
 		m_bDynamicPointLights = 1;
 		m_bWetRoadReflections = 1;
 		m_nRealtimeShadows = 1;
@@ -192,6 +195,7 @@ CModernConfig::ClampValues()
 	m_fLodDistMultiplier = ModernVisualPolicy::LodMultiplier(true, m_fLodDistMultiplier);
 	if (m_nNeonBloom < 0 || m_nNeonBloom > 2) m_nNeonBloom = 0;
 	m_bFxaa = m_bFxaa ? 1 : 0;
+	m_bExperimentalEdgeAA = m_bExperimentalEdgeAA ? 1 : 0;
 	m_bDynamicPointLights = m_bDynamicPointLights ? 1 : 0;
 	m_bWetRoadReflections = m_bWetRoadReflections ? 1 : 0;
 	if (m_nRealtimeShadows < 0 || m_nRealtimeShadows > 2) m_nRealtimeShadows = 0;

@@ -39,6 +39,8 @@ jobs:
           /tmp/gps_path_search
           c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g tests/modern_visual_policy.cpp -o /tmp/modern_visual_policy
           /tmp/modern_visual_policy
+          c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g tests/modern_postfx_policy.cpp -o /tmp/modern_postfx_policy
+          /tmp/modern_postfx_policy
       - name: "Checkout Miles SDK Import Library project"
         uses: actions/checkout@v4
         if: ${{ matrix.audio == 'miles' }}

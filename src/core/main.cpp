@@ -1696,6 +1696,9 @@ Idle(void *arg)
 		tbStartTimer(0, "RenderMotionBlur");
 		TheCamera.RenderMotionBlur();
 		tbEndTimer("RenderMotionBlur");
+#if defined(MODERN_FEATURES) && defined(EXTENDED_COLOURFILTER)
+		CPostFX::RenderExperimentalEdgeAA(Scene.camera);
+#endif
 
 		tbStartTimer(0, "Render2dStuff");
 		Render2dStuff();
@@ -2009,6 +2012,9 @@ void TheGame(void)
 				if ((TheCamera.m_BlurType == MOTION_BLUR_NONE || TheCamera.m_BlurType == MOTION_BLUR_LIGHT_SCENE) && TheCamera.m_ScreenReductionPercentage > 0.0f)
 					TheCamera.SetMotionBlurAlpha(150);
 				TheCamera.RenderMotionBlur();
+#if defined(MODERN_FEATURES) && defined(EXTENDED_COLOURFILTER)
+				CPostFX::RenderExperimentalEdgeAA(Scene.camera);
+#endif
 
 				Render2dStuff();
 			}

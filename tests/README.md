@@ -23,3 +23,15 @@ far-clip restoration decisions, alternating population horizons (including
 startup batches), distance bounds, and memory-budget calculations. It tests
 policy, not the actual camera, streaming, or population systems. Device
 playtesting and visual inspection are still necessary.
+
+## Experimental post-processing
+
+```sh
+c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g \
+  tests/modern_postfx_policy.cpp -o /tmp/modern_postfx_policy
+/tmp/modern_postfx_policy
+python3 tests/test_modern_shaders.py # requires glslangValidator
+```
+
+The shader test links the librw GL headers and checks generated shader files.
+Neither test exercises live frame capture, GPU rendering, or visual quality.

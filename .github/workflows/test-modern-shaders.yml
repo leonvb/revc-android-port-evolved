@@ -23,8 +23,9 @@ jobs:
           if (-not $fxc) { throw 'Windows SDK fxc.exe not found' }
           & $fxc.FullName /nologo /T ps_3_0 /E main /Fo modernAA_PS.cso src/extras/shaders/modernAA_PS.hlsl
           if ($LASTEXITCODE -ne 0) { throw 'HLSL compilation failed' }
-          $bytes = [Convert]::ToBase64String([IO.File]::ReadAllBytes("modernAA_PS.cso"))
-          Write-Output "::notice title=Modern shader bytecode::$bytes"
+          $built = (Get-FileHash modernAA_PS.cso -Algorithm SHA256).Hash
+          $checkedIn = (Get-FileHash src/extras/shaders/obj/modernAA_PS.cso -Algorithm SHA256).Hash
+          if ($built -ne $checkedIn) { throw 'Committed D3D9 shader bytecode differs from the compiled HLSL' }
       - uses: actions/upload-artifact@v4
         with:
           name: modern-d3d9-shaders
