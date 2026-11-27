@@ -130,7 +130,8 @@ vehicleRenderCB(rw::Atomic *atomic, rw::d3d9::InstanceDataHeader *header)
 #endif
 
 	V3d eyePos = rw::engine->currentCamera->getFrame()->getLTM()->pos;
-	d3ddevice->SetVertexShaderConstantF(VSLOC_eye, (float*)&eyePos, 1);
+	float eyeConstant[4] = { eyePos.x, eyePos.y, eyePos.z, 0.0f };
+	d3ddevice->SetVertexShaderConstantF(VSLOC_eye, eyeConstant, 1);
 
 	float reflProps[4];
 	reflProps[0] = Fresnel.Get();
@@ -419,7 +420,8 @@ glossRenderCB(rw::Atomic *atomic, rw::d3d9::InstanceDataHeader *header)
 	setPixelShader(neoGloss_PS);
 
 	V3d eyePos = rw::engine->currentCamera->getFrame()->getLTM()->pos;
-	d3ddevice->SetVertexShaderConstantF(VSLOC_eye, (float*)&eyePos, 1);
+	float eyeConstant[4] = { eyePos.x, eyePos.y, eyePos.z, 0.0f };
+	d3ddevice->SetVertexShaderConstantF(VSLOC_eye, eyeConstant, 1);
 	d3ddevice->SetPixelShaderConstantF(1, (float*)&GlossMult, 1);
 
 	SetRenderState(VERTEXALPHA, TRUE);
@@ -496,7 +498,8 @@ uploadRimData(bool enable)
 	using namespace rw::d3d;
 
 	V3d viewVec = rw::engine->currentCamera->getFrame()->getLTM()->at;
-	d3ddevice->SetVertexShaderConstantF(VSLOC_viewVec, (float*)&viewVec, 1);
+	float viewConstant[4] = { viewVec.x, viewVec.y, viewVec.z, 0.0f };
+	d3ddevice->SetVertexShaderConstantF(VSLOC_viewVec, viewConstant, 1);
 	float rimData[4];
 	rimData[0] = Offset.Get();
 	rimData[1] = Scale.Get();
