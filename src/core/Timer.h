@@ -69,6 +69,23 @@ public:
 	static uint32 GetLogicalFrameCounter(void) { return m_LogicalFrameCounter; }
 	static uint32 GetLogicalFramesPassed(void) { return m_LogicalFramesPassed; }
 #endif
+
+	// Frame-rate-independent math helpers normalized to Vice City's 30 FPS baseline (dt30 = 50/30 = 1.6667)
+	static float GetBaseTimeStep30(void) { return 50.0f / 30.0f; }
+	static float GetTimeStepRatio30(void) { return ms_fTimeStep / (50.0f / 30.0f); }
+	static float GetTimeStepScale(void) { return GetTimeStepRatio30(); }
+	static float GetClampedTimeStep(float maxStep = 3.0f) { return ms_fTimeStep > maxStep ? maxStep : (ms_fTimeStep < 0.0f ? 0.0f : ms_fTimeStep); }
+	static float PowTimeStep(float per30FpsFactor) { return powf(per30FpsFactor, GetTimeStepRatio30()); }
+	static float ExpDecayFactor(float ratePer30Fps)
+	{
+		if (ratePer30Fps <= 0.0f) return 0.0f;
+		if (ratePer30Fps >= 1.0f) return 1.0f;
+		return 1.0f - powf(1.0f - ratePer30Fps, GetTimeStepRatio30());
+	}
+	static float ExpSmooth(float current, float target, float ratePer30Fps)
+	{
+		return current + (target - current) * ExpDecayFactor(ratePer30Fps);
+	}
 };
 
 #endif // __GTA_TIMER_H__

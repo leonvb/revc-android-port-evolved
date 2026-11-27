@@ -519,6 +519,11 @@ static_assert(false, "SUPPORT_XBOX_SCRIPT and SUPPORT_MOBILE_SCRIPT are mutually
 	#define USE_UNNAMED_SEM // named semaphores are unsupported on the switch
 #endif
 
+// Modernization foundation (Phase 0+): runtime settings, high-FPS pacing, and modern feature toggles
+#ifdef CUSTOM_FRONTEND_OPTIONS
+	#define MODERN_FEATURES
+#endif
+
 #endif // VANILLA_DEFINES
 
 #if defined(AUDIO_OAL) && !defined(EXTERNAL_3D_SOUND)

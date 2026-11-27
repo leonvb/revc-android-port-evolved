@@ -30,6 +30,9 @@
 #include "IniFile.h"
 #include "CarCtrl.h"
 #include "Population.h"
+#ifdef MODERN_FEATURES
+#include "ModernConfig.h"
+#endif
 
 // Menu screens array is at the bottom of the file.
 
@@ -102,6 +105,47 @@
 	#define SELECT_CONTROLLER_TYPE
 #endif
 
+#ifdef MODERN_FEATURES
+const char *modernPresets[] = { "FEM_CLS", "FEM_MDN", "FEM_CUS" };
+const char *modernFpsOpts[] = { "FEM_F30", "FEM_F60", "FEM_F90", "FEM_120", "FEM_NAT" };
+const char *modernDrivingStyles[] = { "FEM_CLS", "FEM_MDN" };
+const char *modernGpsOpts[] = { "FEM_OFF", "FEM_GPV", "FEM_ALW" };
+const char *modernAimOpts[] = { "FEM_CLS", "FEM_AFR", "FEM_AAS" };
+const char *modernHapticsOpts[] = { "FEM_OFF", "FEM_SUB", "FEM_FUL" };
+const char *modernGyroOpts[] = { "FEM_OFF", "FEM_GAD", "FEM_ALW" };
+
+void ModernPresetAfterChange(int8 before, int8 after)
+{
+	CModernConfig::ApplyPreset(after);
+	FrontEndMenuManager.SaveSettings();
+}
+
+void ModernTargetFpsAfterChange(int8 before, int8 after)
+{
+	CModernConfig::MarkCustomPresetIfNeeded();
+	CModernConfig::ApplyFrameRateSettings();
+	FrontEndMenuManager.SaveSettings();
+}
+
+void ModernOptionAfterChange(int8 before, int8 after)
+{
+	CModernConfig::MarkCustomPresetIfNeeded();
+	FrontEndMenuManager.SaveSettings();
+}
+
+void RestoreDefModern(int8 action)
+{
+	if (action != FEOPTION_ACTION_SELECT)
+		return;
+	CModernConfig::ResetToClassicDefaults();
+	FrontEndMenuManager.SaveSettings();
+}
+
+	#define TARGET_FPS_SELECTOR MENUACTION_CFO_SELECT, "FEM_TFP", { new CCFOSelect(&CModernConfig::m_nTargetFPS, "Modern", "TargetFPS", modernFpsOpts, ARRAY_SIZE(modernFpsOpts), false, ModernTargetFpsAfterChange) }, 0, 0, MENUALIGN_LEFT,
+#else
+	#define TARGET_FPS_SELECTOR
+#endif
+
 const char *filterNames[] = { "FEM_NON", "FEM_SIM", "FEM_NRM", "FEM_MOB" };
 const char *off_on[] = { "FEM_OFF", "FEM_ON" };
 
@@ -134,6 +178,10 @@ void RestoreDefGraphics(int8 action) {
 		FrontEndMenuManager.m_PrefsUseWideScreen = false;
 		FrontEndMenuManager.m_nDisplayVideoMode = FrontEndMenuManager.m_nPrefsVideoMode;
 		CMBlur::BlurOn = false;
+		#ifdef MODERN_FEATURES
+			CModernConfig::m_nTargetFPS = MODERN_FPS_30;
+			CModernConfig::ApplyFrameRateSettings();
+		#endif
 		FrontEndMenuManager.SaveSettings();
 	#endif
 }
@@ -435,6 +483,7 @@ CMenuScreenCustom aScreens[] = {
 		MENUACTION_FRAMESYNC,	"FEM_VSC", {nil, SAVESLOT_NONE, MENUPAGE_DISPLAY_SETTINGS}, 0, 0, MENUALIGN_LEFT,
 #endif
 		MENUACTION_FRAMELIMIT,	"FEM_FRM", {nil, SAVESLOT_NONE, MENUPAGE_DISPLAY_SETTINGS}, 0, 0, MENUALIGN_LEFT,
+		TARGET_FPS_SELECTOR
 #if defined LEGACY_MENU_OPTIONS && !defined EXTENDED_COLOURFILTER
 		MENUACTION_TRAILS,		"FED_TRA", {nil, SAVESLOT_NONE, MENUPAGE_DISPLAY_SETTINGS}, 0, 0, MENUALIGN_LEFT,
 #endif
@@ -639,14 +688,17 @@ CMenuScreenCustom aScreens[] = {
 	// MENUPAGE_OPTIONS = 27
 	{ "FET_OPT", MENUPAGE_NONE, nil, nil,
 #ifdef GTA_HANDHELD
-		 MENUACTION_CHANGEMENU,		"FEO_CON", {nil, SAVESLOT_NONE, MENUPAGE_CONTROLLER_SETTINGS}, 320, 132, MENUALIGN_CENTER,
+		 MENUACTION_CHANGEMENU,		"FEO_CON", {nil, SAVESLOT_NONE, MENUPAGE_CONTROLLER_SETTINGS}, 320, 120, MENUALIGN_CENTER,
 #else
-		 MENUACTION_CHANGEMENU,		"FEO_CON", {nil, SAVESLOT_NONE, MENUPAGE_CONTROLLER_PC}, 320, 132, MENUALIGN_CENTER,
+		 MENUACTION_CHANGEMENU,		"FEO_CON", {nil, SAVESLOT_NONE, MENUPAGE_CONTROLLER_PC}, 320, 120, MENUALIGN_CENTER,
 #endif
 		 MENUACTION_LOADRADIO,		"FEO_AUD", {nil, SAVESLOT_NONE, MENUPAGE_SOUND_SETTINGS}, 0, 0, MENUALIGN_CENTER,
 		 MENUACTION_CHANGEMENU,		"FEO_DIS", {nil, SAVESLOT_NONE, MENUPAGE_DISPLAY_SETTINGS}, 0, 0, MENUALIGN_CENTER,
 #ifdef GRAPHICS_MENU_OPTIONS
 		 MENUACTION_CHANGEMENU,		"FET_GFX", {nil, SAVESLOT_NONE, MENUPAGE_GRAPHICS_SETTINGS}, 0, 0, MENUALIGN_CENTER,
+#endif
+#ifdef MODERN_FEATURES
+		 MENUACTION_CHANGEMENU,		"FEO_MOD", {nil, SAVESLOT_NONE, MENUPAGE_MODERN_FEATURES}, 0, 0, MENUALIGN_CENTER,
 #endif
 		 MENUACTION_CHANGEMENU,		"FEO_LAN", {nil, SAVESLOT_NONE, MENUPAGE_LANGUAGE_SETTINGS}, 0, 0, MENUALIGN_CENTER,
 		 MENUACTION_PLAYERSETUP,	"FET_PS", {nil, SAVESLOT_NONE, MENUPAGE_SKIN_SELECT}, 0, 0, MENUALIGN_CENTER,
@@ -777,6 +829,7 @@ CMenuScreenCustom aScreens[] = {
 		MENUACTION_FRAMESYNC,	"FEM_VSC", {nil, SAVESLOT_NONE, MENUPAGE_GRAPHICS_SETTINGS}, 0, 0, MENUALIGN_LEFT,
 #endif
 		MENUACTION_FRAMELIMIT,	"FEM_FRM", { nil, SAVESLOT_NONE, MENUPAGE_GRAPHICS_SETTINGS }, 0, 0, MENUALIGN_LEFT,
+		TARGET_FPS_SELECTOR
 		MULTISAMPLING_SELECTOR
 		ISLAND_LOADING_SELECTOR
 		DUALPASS_SELECTOR
@@ -797,6 +850,32 @@ CMenuScreenCustom aScreens[] = {
 		MENUACTION_LABEL,	"FEC_JPR", { nil, SAVESLOT_NONE, MENUPAGE_NONE }, 0, 0, 0,
 		MENUACTION_CFO_DYNAMIC,	"FEC_JDE", { new CCFODynamic(nil, nil, nil, DetectJoystickDraw, nil) }, 80, 200, MENUALIGN_LEFT,
 		MENUACTION_GOBACK,		"FEDS_TB", {nil, SAVESLOT_NONE, MENUPAGE_NONE}, 320, 225, MENUALIGN_CENTER,
+	},
+#endif
+
+#ifdef MODERN_FEATURES
+	// MENUPAGE_MODERN_FEATURES
+	{ "FET_MOD", MENUPAGE_OPTIONS, new CCustomScreenLayout({40, 78, 25, true, true}), nil,
+		MENUACTION_CFO_SELECT,	"FEM_MPR", { new CCFOSelect(&CModernConfig::m_nPreset, "Modern", "Preset", modernPresets, ARRAY_SIZE(modernPresets), false, ModernPresetAfterChange) }, 0, 0, MENUALIGN_LEFT,
+		MENUACTION_CFO_SELECT,	"FEM_MMA", { new CCFOSelect(&CModernConfig::m_bMasterEnable, "Modern", "MasterEnable", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
+		MENUACTION_CFO_SELECT,	"FEM_TFP", { new CCFOSelect(&CModernConfig::m_nTargetFPS, "Modern", "TargetFPS", modernFpsOpts, ARRAY_SIZE(modernFpsOpts), false, ModernTargetFpsAfterChange) }, 0, 0, MENUALIGN_LEFT,
+		MENUACTION_CFO_SELECT,	"FEM_HFP", { new CCFOSelect(&CModernConfig::m_bHighFpsPhysicsFix, "Modern", "HighFpsPhysicsFix", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
+		MENUACTION_CFO_SELECT,	"FEM_DRV", { new CCFOSelect(&CModernConfig::m_nDrivingStyle, "Modern", "DrivingStyle", modernDrivingStyles, ARRAY_SIZE(modernDrivingStyles), false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
+		MENUACTION_CFO_SELECT,	"FEM_MAC", { new CCFOSelect(&CModernConfig::m_bMidAirControl, "Modern", "MidAirControl", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
+		MENUACTION_CFO_SELECT,	"FEM_GPS", { new CCFOSelect(&CModernConfig::m_nGpsRouteMode, "Modern", "GpsRouteMode", modernGpsOpts, ARRAY_SIZE(modernGpsOpts), false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
+		MENUACTION_CFO_SELECT,	"FEM_ASV", { new CCFOSelect(&CModernConfig::m_bAutosave, "Modern", "Autosave", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
+		MENUACTION_CFO_SELECT,	"FEM_VCM", { new CCFOSelect(&CModernConfig::m_bModernVehicleCam, "Modern", "ModernVehicleCam", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
+		MENUACTION_CFO_SELECT,	"FEM_AIM", { new CCFOSelect(&CModernConfig::m_nAimMode, "Modern", "AimMode", modernAimOpts, ARRAY_SIZE(modernAimOpts), false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
+		MENUACTION_CFO_SELECT,	"FEM_WRW", { new CCFOSelect(&CModernConfig::m_bWeaponRadioWheels, "Modern", "WeaponRadioWheels", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
+#if defined(ANDROID)
+		MENUACTION_CFO_SELECT,	"FEM_HAP", { new CCFOSelect(&CModernConfig::m_nHapticsIntensity, "Modern", "HapticsIntensity", modernHapticsOpts, ARRAY_SIZE(modernHapticsOpts), false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
+		MENUACTION_CFO_SELECT,	"FEM_GYR", { new CCFOSelect(&CModernConfig::m_nGyroAimMode, "Modern", "GyroAimMode", modernGyroOpts, ARRAY_SIZE(modernGyroOpts), false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
+#endif
+		MENUACTION_CFO_SELECT,	"FEM_HSP", { new CCFOSelect(&CModernConfig::m_bHoldToSprint, "Modern", "HoldToSprint", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
+		MENUACTION_CFO_SELECT,	"FEM_SWM", { new CCFOSelect(&CModernConfig::m_bSwimming, "Modern", "Swimming", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
+		MENUACTION_CFO_SELECT,	"FEM_MNT", { new CCFOSelect(&CModernConfig::m_bLedgeMantling, "Modern", "LedgeMantling", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
+		MENUACTION_CFO_DYNAMIC,	"FET_DEF", { new CCFODynamic(nil, nil, nil, nil, RestoreDefModern) }, 320, 0, MENUALIGN_CENTER,
+		MENUACTION_GOBACK,		"FEDS_TB", {nil, SAVESLOT_NONE, MENUPAGE_NONE}, 320, 0, MENUALIGN_CENTER,
 	},
 #endif
 

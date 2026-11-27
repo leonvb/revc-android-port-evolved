@@ -35,6 +35,9 @@
 #include "FileLoader.h"
 #include "User.h"
 #include "sampman.h"
+#ifdef MODERN_FEATURES
+#include "ModernConfig.h"
+#endif
 
 // Similar story to Hud.cpp:
 // Game has colors inlined in code.
@@ -4932,6 +4935,9 @@ CMenuManager::ProcessUserInput(uint8 goDown, uint8 goUp, uint8 optionSelected, u
 					m_PrefsShowLegends = true;
 					m_PrefsVsyncDisp = true;
 					m_PrefsFrameLimiter = true;
+#ifdef MODERN_FEATURES
+					CModernConfig::ApplyFrameRateSettings();
+#endif
 					m_PrefsRadarMode = 0;
 					m_PrefsShowHud = true;
 					m_nDisplayVideoMode = m_nPrefsVideoMode;
@@ -5235,6 +5241,9 @@ CMenuManager::ProcessOnOffMenuOptions()
 		break;
 	case MENUACTION_FRAMELIMIT:
 		m_PrefsFrameLimiter = !m_PrefsFrameLimiter;
+#ifdef MODERN_FEATURES
+		CModernConfig::ApplyFrameRateSettings();
+#endif
 		SaveSettings();
 		break;
 	case MENUACTION_TRAILS:

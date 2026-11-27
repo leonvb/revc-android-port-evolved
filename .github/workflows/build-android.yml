@@ -2,7 +2,7 @@ name: reVC Android
 
 on:
   push:
-    branches: [ "miami", "dev" ]
+    branches: [ "miami", "dev", "modern" ]
     paths:
       - 'android/launcher/**'
       - 'gamefiles/**'
@@ -11,7 +11,7 @@ on:
       - 'cmake/**'
       - '.github/workflows/build-android.yml'
   pull_request:
-    branches: [ "miami", "dev" ]
+    branches: [ "miami", "dev", "modern" ]
     paths:
       - 'android/launcher/**'
       - 'gamefiles/**'

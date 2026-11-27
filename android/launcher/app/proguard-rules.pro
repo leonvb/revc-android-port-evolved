@@ -121,6 +121,13 @@
  -dontwarn com.revc.game.MainActivity*
  -keep class com.revc.game.MainActivity { *; }
 
+ -keep class com.revc.game.GameActivity {
+    public void setTargetRefreshRate(int);
+ }
+ -keep class com.revc.game.TouchControlsView {
+    native <methods>;
+ }
+
  -dontwarn androidx.**
  -keep class androidx.** { *; }
 
