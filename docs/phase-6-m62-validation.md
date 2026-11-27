@@ -1,30 +1,38 @@
-# M6.2 post-processing: experimental edge smoothing
+# M6.2 post-processing
 
-This branch contains an **opt-in experimental edge-smoothing pass**, not the
-roadmap's FXAA 3.11 Quality implementation. It is off by default, including in
-the Modern preset; enable Modern features and select `EDGE AA (EXPERIMENTAL)`
-in the Graphics menu (or Display menu on builds without a separate Graphics
-page). The persistent setting is `[Modern] ExperimentalEdgeAA`; disabling the
-Modern master switch bypasses it.
+The Modern master switch gates FXAA 3.11 Quality and Dual-Kawase bloom on
+GL/GLES and D3D9. `[Modern] FXAA` selects FXAA; the old experimental edge AA
+remains an independently selectable fallback and is not FXAA. If both are
+selected, FXAA takes precedence. `[Modern] NeonBloom` has Off, Low and High
+settings. The Modern preset selects FXAA and High bloom; Classic selects off.
+See `docs/fxaa-third-party.md` for FXAA provenance and binary notices.
 
-The pass captures the rendered game scene after motion blur and before HUD/menu
-rendering and samples a bounded, contrast-adaptive neighborhood. It supports
-GL3/GLES and D3D9 shader model 3, skips the effect if shader creation fails or
-the framebuffer is unavailable, and does not require an additional raster.
-It uses the existing power-of-two backbuffer and clamps samples to the copied
-area. Source, generated GLSL include, D3D9 bytecode and an include generated
-from the bytecode are checked in. The shader workflow compiles/links the actual
-librw vertex and fragment headers for desktop GL and GLES and compiles the HLSL
-with the Windows SDK; it also verifies the generated assets.
+Bloom captures after motion blur and before HUD, extracts highlights into a
+three-level half/quarter/eighth-resolution pyramid, downsamples and upsamples
+using Dual-Kawase kernels, and adds the result to the scene before FXAA. The
+peak-channel LDR soft-knee threshold retains saturated red/blue; it is not an
+HDR or emissive-mask pass and can also pick up bright non-emissive surfaces.
+Intensity is reduced during daytime. Targets are color-only, released with the
+postfx lifecycle, bounded by device maximum size and a conservative 24 MiB
+minimum-size budget, and bypassed after allocation or target-binding failure.
+The renderer resumes the scene camera and its depth buffer on failure. D3D9
+ends each scene before beginning the next; GL checks FBO completeness.
 
-## Still required
+The scene copy path currently uses camera-raster dimensions at reduced GL/SDL
+render scale. Both modern effects skip at reduced scale; other existing effects
+may still use the copy path. Unsupported shader models, unavailable shaders,
+invalid capture bounds and failed target creation bypass the new effects.
+The budget estimates tightly packed RGBA8 memory, not actual driver allocation.
 
-- Validate visually on actual GL3, Android/Switch GLES and D3D9 devices: verify
-  image orientation, aspect ratios, non-power-of-two resolutions, resize/device
-  loss, menus, HUD, cutscenes, motion blur, droplets and master toggle changes.
-- Measure GPU/frame time and texture-copy cost, especially on mobile GPUs.
-- Implement and validate FXAA 3.11 Quality (the existing FXAA setting is still
-  a placeholder) and Dual-Kawase bloom with a safe render-target lifecycle and
-  backend parity. This experimental AA does not complete M6.2.
-- M6.3–M6.5 remain unimplemented: per-pixel point lights, wet-road material
-  reflections, and directional real-time shadows.
+## Evidence and remaining checks
+
+- Standalone tests exercise pairing, bounds, target budget, pass ordering,
+  day/night factor and a CPU reference of the bloom filter math; they do not
+  execute rendering. Shader CI compiles/links desktop GL and GLES and compiles
+  HLSL SM3; it also verifies embedded bytecode and generated GLSL includes.
+- Real-device visual and performance behavior has not been independently
+  verified here. In particular, exercise GL/D3D orientation, odd dimensions,
+  half-pixel offsets, target switches, resize/device loss, allocation failures,
+  screenshots, motion blur, HUD, menus, mobile bandwidth, and driver behavior.
+- M6.3–M6.5 still require per-pixel point lights, wet-road reflections and
+  directional real-time shadows; M6.2 is not a claim that all Phase 6 is done.

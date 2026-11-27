@@ -428,7 +428,7 @@ CRenderer::RenderOneBuilding(CEntity *ent, float camdist)
 		alpha = mi->m_alpha * fadefactor;
 
 		if(alpha == 255)
-			WorldRender::AtomicFirstPass(atomic, pass);
+			WorldRender::AtomicFirstPass(atomic, pass, IsRoad(ent));
 		else{
 			// not quite sure what this is about, do we have to do that?
 			RpGeometry *geo = RpAtomicGetGeometry(lodatm);
@@ -437,7 +437,7 @@ CRenderer::RenderOneBuilding(CEntity *ent, float camdist)
 			WorldRender::AtomicFullyTransparent(atomic, pass, alpha);
 		}
 	}else
-		WorldRender::AtomicFirstPass(atomic, pass);
+		WorldRender::AtomicFirstPass(atomic, pass, IsRoad(ent));
 
 	ent->bImBeingRendered = false;	// TODO: this seems wrong, but do we even need it?
 }

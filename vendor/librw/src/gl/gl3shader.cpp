@@ -124,11 +124,11 @@ void
 flushUniforms(void)
 {
 	for(int i = 0; i < uniformRegistry.numUniforms; i++){
-		// this is bad!
-		if(i >= currentShader->numUniforms){
-			printf("trying to set uniform %d %s that doesn't exist!\n", i, uniformRegistry.uniforms[i].name);
+		// A shader created before a later user uniform was registered cannot
+		// reference that uniform. It is safe to skip it; logging on every draw
+		// can otherwise flood the log after optional effects register uniforms.
+		if(i >= currentShader->numUniforms)
 			continue;
-		}
 
 		int32 loc = currentShader->uniformLocations[i];
 		if(loc == -1)

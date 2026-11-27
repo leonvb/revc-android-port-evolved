@@ -77,6 +77,7 @@ void CustomPipeShutdown(void);
 void SetTxdFindCallback(void);
 
 extern bool bRenderingEnvMap;
+extern bool EnvMapHasFrame;
 extern int32 EnvMapSize;
 extern rw::Camera *EnvMapCam;
 extern rw::Texture *EnvMapTex;
@@ -138,7 +139,7 @@ void AttachRimPipe(rw::Clump *clump);
 
 namespace WorldRender{
 extern int numBlendInsts[3];
-void AtomicFirstPass(RpAtomic *atomic, int pass);
+void AtomicFirstPass(RpAtomic *atomic, int pass, bool road);
 void AtomicFullyTransparent(RpAtomic *atomic, int pass, int fadeAlpha);
 void RenderBlendPass(int pass);
 }

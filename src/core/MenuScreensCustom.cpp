@@ -108,6 +108,7 @@
 #ifdef MODERN_FEATURES
 const char *modernPresets[] = { "FEM_CLS", "FEM_MDN", "FEM_CUS" };
 const char *modernFpsOpts[] = { "FEM_F30", "FEM_F60", "FEM_F90", "FEM_120", "FEM_NAT" };
+const char *modernBloomOpts[] = { "FEM_OFF", "FEM_LOW", "FEM_HIG" };
 const char *modernDrivingStyles[] = { "FEM_CLS", "FEM_MDN" };
 const char *modernGpsOpts[] = { "FEM_OFF", "FEM_GPV", "FEM_ALW" };
 const char *modernAimOpts[] = { "FEM_CLS", "FEM_AFR", "FEM_AAS" };
@@ -153,8 +154,10 @@ void RestoreDefModern(int8 action)
 #endif
 
 #if defined(MODERN_FEATURES) && defined(EXTENDED_COLOURFILTER) && (defined(RW_OPENGL) || defined(RW_D3D9))
+	#define FXAA_SELECTOR MENUACTION_CFO_SELECT, "FEM_FXA", { new CCFOSelect(&CModernConfig::m_bFxaa, "Modern", "FXAA", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
 	#define EXPERIMENTAL_EDGE_AA_SELECTOR MENUACTION_CFO_SELECT, "FEM_EAA", { new CCFOSelect(&CModernConfig::m_bExperimentalEdgeAA, "Modern", "ExperimentalEdgeAA", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
 #else
+	#define FXAA_SELECTOR
 	#define EXPERIMENTAL_EDGE_AA_SELECTOR
 #endif
 
@@ -507,6 +510,7 @@ CMenuScreenCustom aScreens[] = {
 		MENUACTION_SCREENRES,	"FED_RES", {nil, SAVESLOT_NONE, MENUPAGE_DISPLAY_SETTINGS}, 0, 0, MENUALIGN_LEFT,
 		VIDEOMODE_SELECTOR
 		MULTISAMPLING_SELECTOR
+		FXAA_SELECTOR
 		EXPERIMENTAL_EDGE_AA_SELECTOR
 		ISLAND_LOADING_SELECTOR
 		DUALPASS_SELECTOR
@@ -844,6 +848,7 @@ CMenuScreenCustom aScreens[] = {
 		MENUACTION_FRAMELIMIT,	"FEM_FRM", { nil, SAVESLOT_NONE, MENUPAGE_GRAPHICS_SETTINGS }, 0, 0, MENUALIGN_LEFT,
 		TARGET_FPS_SELECTOR
 		MULTISAMPLING_SELECTOR
+		FXAA_SELECTOR
 		EXPERIMENTAL_EDGE_AA_SELECTOR
 		ISLAND_LOADING_SELECTOR
 		DUALPASS_SELECTOR
@@ -877,6 +882,13 @@ CMenuScreenCustom aScreens[] = {
 		MENUACTION_CFO_SELECT,	"FEM_DRV", { new CCFOSelect(&CModernConfig::m_nDrivingStyle, "Modern", "DrivingStyle", modernDrivingStyles, ARRAY_SIZE(modernDrivingStyles), false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
 		MENUACTION_CFO_SELECT,	"FEM_MAC", { new CCFOSelect(&CModernConfig::m_bMidAirControl, "Modern", "MidAirControl", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
 		MENUACTION_CFO_SLIDER,	"FEM_LDM", { new CCFOSlider(&CModernConfig::m_fLodDistMultiplier, "Modern", "LodDistMultiplier", 1.0f, 4.0f, ModernLodAfterChange) }, 0, 0, MENUALIGN_LEFT,
+#if defined(EXTENDED_COLOURFILTER) && (defined(RW_OPENGL) || defined(RW_D3D9))
+		MENUACTION_CFO_SELECT,	"FEM_BLM", { new CCFOSelect(&CModernConfig::m_nNeonBloom, "Modern", "NeonBloom", modernBloomOpts, ARRAY_SIZE(modernBloomOpts), false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
+#endif
+#if defined(EXTENDED_PIPELINES) && (defined(RW_OPENGL) || defined(RW_D3D9))
+		MENUACTION_CFO_SELECT,	"FEM_DPL", { new CCFOSelect(&CModernConfig::m_bDynamicPointLights, "Modern", "DynamicPointLights", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
+		MENUACTION_CFO_SELECT,	"FEM_WET", { new CCFOSelect(&CModernConfig::m_bWetRoadReflections, "Modern", "WetRoadReflections", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
+#endif
 		MENUACTION_CFO_SELECT,	"FEM_GPS", { new CCFOSelect(&CModernConfig::m_nGpsRouteMode, "Modern", "GpsRouteMode", modernGpsOpts, ARRAY_SIZE(modernGpsOpts), false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
 		MENUACTION_CFO_SELECT,	"FEM_ASV", { new CCFOSelect(&CModernConfig::m_bAutosave, "Modern", "Autosave", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
 		MENUACTION_CFO_SELECT,	"FEM_VCM", { new CCFOSelect(&CModernConfig::m_bModernVehicleCam, "Modern", "ModernVehicleCam", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
