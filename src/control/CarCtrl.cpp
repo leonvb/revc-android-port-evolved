@@ -1,4 +1,7 @@
 #include "common.h"
+#ifdef MODERN_FEATURES
+#include "ModernVisualPolicy.h"
+#endif
 
 #include "CarCtrl.h"
 
@@ -121,7 +124,7 @@ CCarCtrl::GenerateRandomCars()
 			GenerateOneRandomCar();
 		else if (--CountDownToCarsAtStart == 0) {
 			for (int i = 0; i < 100; i++)
-				GenerateOneRandomCar();
+				GenerateOneRandomCar(true);
 			CTheCarGenerators::GenerateEvenIfPlayerIsCloseCounter = 20;
 		}
 	}
@@ -131,8 +134,11 @@ CCarCtrl::GenerateRandomCars()
 }
 
 void
-CCarCtrl::GenerateOneRandomCar()
+CCarCtrl::GenerateOneRandomCar(bool initialBatch)
 {
+#ifndef MODERN_FEATURES
+	(void)initialBatch;
+#endif
 	static int32 unk = 0;
 	bool bTopDownCamera = false;
 	CPlayerInfo* pPlayer = &CWorld::Players[CWorld::PlayerInFocus];
@@ -290,6 +296,12 @@ CCarCtrl::GenerateOneRandomCar()
 			break;
 		}
 	}
+#ifdef MODERN_FEATURES
+	// Keep the normal near/off-screen and wanted-car spawns. Only alternate
+	// ordinary forward requests further out; existing pool limits still apply.
+	if (invertAngleLimitTest && !bTopDownCamera && carClass != COPS && carClass != COPS_BOAT)
+		preferredDistance *= ModernVisualPolicy::SpawnHorizon(TheCamera.GetModernLodMultiplier(), CTimer::GetFrameCounter(), initialBatch);
+#endif
 	if (!ThePaths.GenerateCarCreationCoors(vecTargetPos.x, vecTargetPos.y, frontX, frontY,
 		preferredDistance, angleLimit, invertAngleLimitTest, &spawnPosition, &curNodeId, &nextNodeId,
 		&positionBetweenNodes, carClass == COPS && pWanted->GetWantedLevel() >= 1))
@@ -596,7 +608,12 @@ CCarCtrl::GenerateOneRandomCar()
 			return;
 		}
 	}else{
-		if ((vecTargetPos - pVehicle->GetPosition()).Magnitude2D() > TheCamera.GenerationDistMultiplier * (pVehicle->bExtendedRange ? EXTENDED_RANGE_DESPAWN_MULTIPLIER : 1.0f) * ONSCREEN_DESPAWN_RANGE ||
+#ifdef MODERN_FEATURES
+		float maxSpawnHorizon = TheCamera.GetModernPopulationHorizon();
+#else
+		float maxSpawnHorizon = 1.0f;
+#endif
+		if ((vecTargetPos - pVehicle->GetPosition()).Magnitude2D() > TheCamera.GenerationDistMultiplier * maxSpawnHorizon * (pVehicle->bExtendedRange ? EXTENDED_RANGE_DESPAWN_MULTIPLIER : 1.0f) * ONSCREEN_DESPAWN_RANGE ||
 			(vecTargetPos - pVehicle->GetPosition()).Magnitude2D() < TheCamera.GenerationDistMultiplier * MINIMAL_DISTANCE_TO_SPAWN_ONSCREEN) {
 			delete pVehicle;
 			return;
@@ -980,6 +997,10 @@ CCarCtrl::PossiblyRemoveVehicle(CVehicle* pVehicle)
 #endif
 		{
 			threshold = ONSCREEN_DESPAWN_RANGE * TheCamera.GenerationDistMultiplier;
+#ifdef MODERN_FEATURES
+			if (!pVehicle->bIsLawEnforcer)
+				threshold *= TheCamera.GetModernPopulationHorizon();
+#endif
 		}
 #ifndef EXTENDED_OFFSCREEN_DESPAWN_RANGE
 		if (TheCamera.GetForward().z < -0.9f)

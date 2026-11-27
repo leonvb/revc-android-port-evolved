@@ -220,7 +220,16 @@ bool CCarGenerator::CheckIfWithinRangeOfAnyPlayers()
 	float distance = direction.Magnitude();
 	float farclip = 110.0f * TheCamera.GenerationDistMultiplier;
 	float nearclip = farclip - 20.0f;
-	bool canBeRemoved = (m_nModelIndex > 0 && CModelInfo::IsBoatModel(m_nModelIndex) && 165.0f * TheCamera.GenerationDistMultiplier > distance &&
+	float boatclip = 165.0f * TheCamera.GenerationDistMultiplier;
+#ifdef MODERN_FEATURES
+	// Do not shift the inner exclusion zone or forced generators.
+	if (!m_bForceSpawn) {
+		float horizon = TheCamera.GetModernPopulationHorizon();
+		farclip *= horizon;
+		boatclip *= horizon;
+	}
+#endif
+	bool canBeRemoved = (m_nModelIndex > 0 && CModelInfo::IsBoatModel(m_nModelIndex) && boatclip > distance &&
 		TheCamera.IsSphereVisible(m_vecPos, 0.0f) && !COcclusion::IsPositionOccluded(m_vecPos, 0.0f)); 
 	if (distance >= farclip && !canBeRemoved){
 		if (m_bIsBlocking)

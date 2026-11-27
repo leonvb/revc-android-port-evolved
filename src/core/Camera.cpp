@@ -72,6 +72,26 @@ enum
 #define PLAYER (CWorld::Players[CWorld::PlayerInFocus].m_pPed)
 // NB: removed explicit TheCamera from all functions
 
+#ifdef MODERN_FEATURES
+float
+CCamera::GetModernLodMultiplier(void) const
+{
+	if (ActiveCam >= ARRAY_SIZE(Cams))
+		return 1.0f;
+	int mode = Cams[ActiveCam].Mode;
+	bool eligible = !CCutsceneMgr::IsRunning() && !CCutsceneMgr::IsCutsceneProcessing() &&
+	    !CGame::IsInInterior() && WhoIsInControlOfTheCamera == CAMCONTROL_GAME &&
+	    mode != CCam::MODE_TOPDOWN && mode != CCam::MODE_GTACLASSIC && mode != CCam::MODE_TOP_DOWN_PED;
+	return ModernVisualPolicy::SceneLodMultiplier(eligible, CModernConfig::GetLodDistanceMultiplier());
+}
+
+float
+CCamera::GetModernPopulationHorizon(void) const
+{
+	return ModernVisualPolicy::GenerationMultiplier(GetModernLodMultiplier());
+}
+#endif
+
 CCamera TheCamera;
 #ifdef PC_PLAYER_CONTROLS
 bool CCamera::m_bUseMouse3rdPerson = true;
@@ -635,12 +655,7 @@ CCamera::Process(void)
 	GenerationDistMultiplier = LODDistMultiplier;
 	LODDistMultiplier *= CRenderer::ms_lodDistScale;
 #ifdef MODERN_FEATURES
-	// Keep cinematic cameras and interiors on their original streaming budget.
-	if (!CCutsceneMgr::IsRunning() && !CCutsceneMgr::IsCutsceneProcessing() && !CGame::IsInInterior()) {
-		float modernLod = CModernConfig::GetLodDistanceMultiplier();
-		LODDistMultiplier *= modernLod;
-		GenerationDistMultiplier *= ModernVisualPolicy::GenerationMultiplier(modernLod);
-	}
+	LODDistMultiplier *= GetModernLodMultiplier();
 #endif
 
 	CDraw::SetNearClipZ(RwCameraGetNearClipPlane(m_pRwCamera));

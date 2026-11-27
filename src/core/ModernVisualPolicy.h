@@ -11,11 +11,26 @@ inline float LodMultiplier(bool enabled, float value)
 	if (!enabled || !(value >= 1.0f)) return 1.0f; // also catches NaN
 	return value > 4.0f ? 4.0f : value;
 }
+inline float SceneLodMultiplier(bool eligible, float configuredLod)
+{
+	return eligible ? LodMultiplier(true, configuredLod) : 1.0f;
+}
+inline bool ShouldPrepareFarClip(bool extended, bool wasExtended, float currentFar, float lastExtendedFar)
+{
+	// Do not replace a clip deliberately set by a scripted or top-down camera.
+	return extended || (wasExtended && currentFar == lastExtendedFar);
+}
 inline float GenerationMultiplier(float lod)
 {
 	// Keep spawn rings within the fixed-size ped/vehicle pools. Applying the
 	// full visual multiplier would starve the player's immediate surroundings.
 	return 1.0f + (LodMultiplier(true, lod) - 1.0f) * 0.125f;
+}
+// Alternate batches without consuming game RNG or moving all spawns away from
+// the player. Use bit 2 since car selection already uses the low two bits.
+inline float SpawnHorizon(float lod, unsigned int frame, bool initialBatch = false)
+{
+	return !initialBatch && (frame & 4u) ? GenerationMultiplier(lod) : 1.0f;
 }
 inline float FarClip(float original, float lod)
 {

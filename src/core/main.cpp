@@ -1,6 +1,5 @@
 #include "common.h"
 #ifdef MODERN_FEATURES
-#include "ModernConfig.h"
 #include "ModernVisualPolicy.h"
 #endif
 #include <time.h>
@@ -83,19 +82,10 @@
 #include "GitSHA1.h"
 #endif
 
-#ifdef MODERN_FEATURES
-static float ModernSceneMultiplier()
-{
-	if (CCutsceneMgr::IsRunning() || CCutsceneMgr::IsCutsceneProcessing() || CGame::IsInInterior())
-		return 1.0f;
-	return CModernConfig::GetLodDistanceMultiplier();
-}
-#endif
-
 static float SceneFarClip()
 {
 #ifdef MODERN_FEATURES
-	return ModernVisualPolicy::FarClip(CTimeCycle::GetFarClip(), ModernSceneMultiplier());
+	return ModernVisualPolicy::FarClip(CTimeCycle::GetFarClip(), TheCamera.GetModernLodMultiplier());
 #else
 	return CTimeCycle::GetFarClip();
 #endif
@@ -104,7 +94,7 @@ static float SceneFarClip()
 static float SceneFogStart()
 {
 #ifdef MODERN_FEATURES
-	if (ModernSceneMultiplier() <= 1.0f) return CTimeCycle::GetFogStart();
+	if (TheCamera.GetModernLodMultiplier() <= 1.0f) return CTimeCycle::GetFogStart();
 	float originalFar = CTimeCycle::GetFarClip();
 	return originalFar > 0.0f ? CTimeCycle::GetFogStart() * SceneFarClip() / originalFar : CTimeCycle::GetFogStart();
 #else
@@ -116,11 +106,16 @@ static float SceneFogStart()
 static void PrepareModernSceneClip()
 {
 	static bool wasExtended;
-	bool extended = ModernSceneMultiplier() > 1.0f;
-	if (extended || wasExtended) {
+	static float lastExtendedFarClip;
+	bool extended = TheCamera.GetModernLodMultiplier() > 1.0f;
+	// A camera mode may have installed its own clip since the last frame.
+	// Only restore our previous value if it hasn't already been replaced.
+	if (ModernVisualPolicy::ShouldPrepareFarClip(extended, wasExtended, RwCameraGetFarClipPlane(Scene.camera), lastExtendedFarClip)) {
 		float farClip = SceneFarClip();
 		RwCameraSetFarClipPlane(Scene.camera, farClip);
 		CDraw::SetFarClipZ(farClip);
+		if (extended)
+			lastExtendedFarClip = farClip;
 	}
 	wasExtended = extended;
 }

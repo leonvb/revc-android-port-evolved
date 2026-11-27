@@ -18,6 +18,8 @@ c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g \
 /tmp/modern_visual_policy
 ```
 
-This exercises master-off and invalid-value behavior, visual and population
-distance limits, far-clip bounds, and memory-budget calculations. Device
+This exercises master-off and invalid-value behavior, scene eligibility,
+far-clip restoration decisions, alternating population horizons (including
+startup batches), distance bounds, and memory-budget calculations. It tests
+policy, not the actual camera, streaming, or population systems. Device
 playtesting and visual inspection are still necessary.

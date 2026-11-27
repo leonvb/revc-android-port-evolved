@@ -628,6 +628,12 @@ public:
 
 	// Physical camera
 	void SetRwCamera(RwCamera *cam);
+#ifdef MODERN_FEATURES
+	// Only extend the normal outdoor gameplay camera, not scripted or
+	// cinematic views or the intentionally short-range top-down cameras.
+	float GetModernLodMultiplier(void) const;
+	float GetModernPopulationHorizon(void) const;
+#endif
 	const CMatrix& GetCameraMatrix(void) { return m_cameraMatrix; }
 	CVector &GetGameCamPosition(void) { return m_vecGameCamPos; }
 	void CalculateDerivedValues(void);
