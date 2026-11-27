@@ -94,8 +94,17 @@ jobs:
       - name: "Build reVC (conan build)"
         shell: bash
         run: |
+          GFXLIB_OPT=""
+          if [ "${{ matrix.platform }}" = "gl3" ]; then
+            GFXLIB_OPT="-o librw/*:gl3_gfxlib=${{ matrix.gl3_gfxlib || 'glfw' }}"
+          fi
           set -o pipefail
-          conan build . --output-folder=build -s build_type=RelWithDebInfo 2>&1 | tee build.log || {
+          conan build . \
+            --output-folder=build \
+            -o "&:audio=${{ matrix.audio }}" \
+            -o "librw/*:platform=${{ matrix.platform }}" \
+            ${GFXLIB_OPT} \
+            -s build_type=RelWithDebInfo 2>&1 | tee build.log || {
             ERRS=$(grep -iE "fatal error|error C[0-9]+|error LNK[0-9]+|CMake Error|undefined reference|error:" build.log | head -n 5 | tr '\n' ' ')
             echo "::error::Build failed: ${ERRS}"
             exit 1

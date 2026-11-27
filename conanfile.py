@@ -28,7 +28,7 @@ class ReVCConan(ConanFile):
         self.requires(f"librw/{self.version}")
         self.requires("mpg123/1.31.2")
         if self.options.audio == "openal":
-            self.requires("openal-soft/1.23.1")
+            self.requires("openal-soft/1.24.3")
         elif self.options.audio == "miles":
             self.requires(f"miles-sdk/{self.version}")
         if self.options.with_libsndfile:
