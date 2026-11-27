@@ -33,6 +33,7 @@ void *colourfilterVC_PS;
 void *contrast_PS;
 #ifdef MODERN_FEATURES
 static void *modernAA_PS;
+static void *modernFXAA_PS;
 #endif
 #endif
 #ifdef RW_OPENGL
@@ -168,6 +169,8 @@ CPostFX::Open(RwCamera *cam)
 #ifdef MODERN_FEATURES
 #include "shaders/obj/modernAA_PS.inc"
 	modernAA_PS = rw::d3d::createPixelShader(modernAA_PS_cso);
+#include "shaders/obj/modernFXAA_PS.inc"
+	modernFXAA_PS = rw::d3d::createPixelShader(modernFXAA_PS_cso);
 	// Unsupported shader model or device: leave the effect disabled.
 #endif
 #endif
@@ -227,6 +230,10 @@ CPostFX::Close(void)
 	if(modernAA_PS){
 		rw::d3d::destroyPixelShader(modernAA_PS);
 		modernAA_PS = nil;
+	}
+	if(modernFXAA_PS){
+		rw::d3d::destroyPixelShader(modernFXAA_PS);
+		modernFXAA_PS = nil;
 	}
 #endif
 	if(colourfilterVC_PS){
@@ -459,8 +466,9 @@ CPostFX::RenderExperimentalEdgeAA(RwCamera *cam)
 	if (!shader && CModernConfig::m_bExperimentalEdgeAA) shader = modernAA;
 	if (!shader) return;
 #else
-	// D3D9 FXAA remains disabled until its SM3 bytecode is available.
-	if (!CModernConfig::m_bExperimentalEdgeAA || !modernAA_PS) return;
+	void *shader = CModernConfig::m_bFxaa ? modernFXAA_PS : nil;
+	if (!shader && CModernConfig::m_bExperimentalEdgeAA) shader = modernAA_PS;
+	if (!shader) return;
 #endif
 	int width = RwRasterGetWidth(RwCameraGetRaster(cam));
 	int height = RwRasterGetHeight(RwCameraGetRaster(cam));
@@ -488,7 +496,7 @@ CPostFX::RenderExperimentalEdgeAA(RwCamera *cam)
 	glUniform4fv(shader->uniformLocations[u_modernAA], 1, params);
 #else
 	rw::d3d::d3ddevice->SetPixelShaderConstantF(10, params, 1);
-	rw::d3d::im2dOverridePS = modernAA_PS;
+	rw::d3d::im2dOverridePS = shader;
 #endif
 	RwIm2DRenderIndexedPrimitive(rwPRIMTYPETRILIST, Vertex, 4, Index, 6);
 #ifdef RW_OPENGL

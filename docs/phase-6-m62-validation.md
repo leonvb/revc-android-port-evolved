@@ -1,7 +1,7 @@
 # M6.2 post-processing: experimental edge smoothing
 
-This branch contains FXAA 3.11 Quality for GL/GLES and an independent
-**opt-in experimental edge-smoothing pass**. D3D9 FXAA is not yet wired. It is off by default, including in
+This branch contains FXAA 3.11 Quality for GL/GLES and D3D9, plus an independent
+**opt-in experimental edge-smoothing pass**. It is off by default, including in
 the Modern preset; enable Modern features and select `EDGE AA (EXPERIMENTAL)`
 in the Graphics menu (or Display menu on builds without a separate Graphics
 page). The persistent setting is `[Modern] ExperimentalEdgeAA`; disabling the
@@ -23,8 +23,8 @@ with the Windows SDK; it also verifies the generated assets.
   image orientation, aspect ratios, non-power-of-two resolutions, resize/device
   loss, menus, HUD, cutscenes, motion blur, droplets and master toggle changes.
 - Measure GPU/frame time and texture-copy cost, especially on mobile GPUs.
-- Complete D3D9 FXAA and integrate Dual-Kawase bloom with a safe render-target
-  lifecycle and backend parity. Experimental AA alone does not complete M6.2.
+- Integrate Dual-Kawase bloom with a safe render-target lifecycle and backend
+  parity. Experimental AA alone does not complete M6.2.
 - M6.3–M6.5 remain unimplemented: per-pixel point lights, wet-road material
   reflections, and directional real-time shadows.
 

@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-// CPU-side proposal for a three-level bloom chain. Not used for rendering yet.
+// CPU-side plan for a three-level bloom chain.
 // The byte count is a *minimum* for tightly packed RGBA8 color targets, not a
 // guarantee of driver allocation size, support for NPOT targets, or available
 // GPU memory. Allocation/format/FBO failure must still bypass the effect.
@@ -49,6 +49,18 @@ inline bool Bounds(int textureWidth, int textureHeight, int x, int y,
 	out[2] = (float(x + width) - 0.5f) / float(textureWidth);
 	out[3] = (float(y + height) - 0.5f) / float(textureHeight);
 	return true;
+}
+
+// Daytime highlights are deliberately subdued; transitions span two hours.
+inline float NightFactor(int hour, int minute)
+{
+	if(hour < 0 || hour > 23 || minute < 0 || minute > 59)
+		return 0.35f;
+	float t = float(hour) + float(minute) / 60.0f;
+	float night = t < 5.0f || t >= 20.0f ? 1.0f :
+	              t < 7.0f ? (7.0f - t) / 2.0f :
+	              t < 18.0f ? 0.0f : (t - 18.0f) / 2.0f;
+	return 0.35f + 0.65f * night;
 }
 
 // -1 denotes the captured scene; levels 0, 1, 2 are distinct textures.

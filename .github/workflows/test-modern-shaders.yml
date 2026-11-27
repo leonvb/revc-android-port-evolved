@@ -26,15 +26,16 @@ jobs:
           $built = (Get-FileHash modernAA_PS.cso -Algorithm SHA256).Hash
           $checkedIn = (Get-FileHash src/extras/shaders/obj/modernAA_PS.cso -Algorithm SHA256).Hash
           if ($built -ne $checkedIn) { throw 'Committed D3D9 shader bytecode differs from the compiled HLSL' }
-          # Bloom is compile-checked only; no runtime bytecode is committed yet.
-          & $fxc.FullName /nologo /T ps_3_0 /E main /Fo modernBloom_PS.cso src/extras/shaders/modernBloom_PS.hlsl
-          if ($LASTEXITCODE -ne 0) { throw 'Bloom HLSL compilation failed' }
-          & $fxc.FullName /nologo /T ps_3_0 /E main /Fo modernFXAA_PS.cso src/extras/shaders/modernFXAA_PS.hlsl
-          if ($LASTEXITCODE -ne 0) { throw 'FXAA HLSL compilation failed' }
-          $bloom64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes('modernBloom_PS.cso'))
-          $fxaa64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes('modernFXAA_PS.cso'))
-          Write-Output "::notice title=Bloom SM3 bytecode::$bloom64"
-          Write-Output "::notice title=FXAA SM3 bytecode::$fxaa64"
+          foreach ($shader in @('modernBloom', 'modernFXAA')) {
+            & $fxc.FullName /nologo /T ps_3_0 /E main /Fo "$($shader)_PS.cso" "src/extras/shaders/$($shader)_PS.hlsl"
+            if ($LASTEXITCODE -ne 0) { throw "$shader HLSL compilation failed" }
+            $built = (Get-FileHash "$($shader)_PS.cso" -Algorithm SHA256).Hash
+            $checkedIn = (Get-FileHash "src/extras/shaders/obj/$($shader)_PS.cso" -Algorithm SHA256).Hash
+            if ($shader -eq 'modernBloom') {
+              $data = [Convert]::ToBase64String([IO.File]::ReadAllBytes("$($shader)_PS.cso"))
+              Write-Output "::notice title=Bloom SM3 bytecode::$data"
+            } elseif ($built -ne $checkedIn) { throw "$shader bytecode differs from the compiled HLSL" }
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: modern-d3d9-shaders

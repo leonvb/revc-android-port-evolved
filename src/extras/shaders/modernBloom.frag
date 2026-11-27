@@ -1,11 +1,11 @@
-// Dual-Kawase bloom building block. This source is not wired into the game yet.
+// Dual-Kawase bright-pass, downsample and upsample kernels.
 // Bounds are inclusive texel centers of the valid part of the source texture,
 // in the source's native texture orientation. v_tex0 is already in that same
 // orientation; each pass must supply its own orientation and bounds.
 uniform sampler2D tex0;
 uniform vec4 u_bloomBounds; // minU, minV, maxU, maxV
 uniform vec4 u_bloomTexel;  // 1/texture width, 1/texture height, radius, unused
-uniform vec4 u_bloomParams; // threshold, soft knee, pass (0=bright/down, 1=down, 2=up), unused
+uniform vec4 u_bloomParams; // threshold, soft knee, pass (0=bright/down, 1=down, 2=up), intensity
 FSIN vec2 v_tex0;
 
 vec3 bloomSample(vec2 uv)
@@ -57,5 +57,5 @@ void main(void)
     vec3 color = u_bloomParams.z < 1.5
         ? bloomDownSample(v_tex0, u_bloomParams.z < 0.5)
         : bloomUpSample(v_tex0);
-    FRAGCOLOR(vec4(color, 1.0));
+    FRAGCOLOR(vec4(color * u_bloomParams.w, 1.0));
 }

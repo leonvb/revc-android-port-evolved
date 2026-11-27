@@ -1,8 +1,8 @@
-// SM3 counterpart of modernBloom.frag. Not wired into the game yet.
+// SM3 counterpart of modernBloom.frag.
 sampler2D tex0 : register(s0);
 float4 bloomBounds : register(c10); // minU, minV, maxU, maxV, inclusive texel centers
 float4 bloomTexel  : register(c11); // reciprocal texture size, radius, unused
-float4 bloomParams : register(c12); // threshold, soft knee, pass, unused
+float4 bloomParams : register(c12); // threshold, soft knee, pass, intensity
 struct PS_INPUT {
     float4 position : POSITION;
     float3 texcoord : TEXCOORD0;
@@ -53,5 +53,5 @@ float4 main(PS_INPUT input) : COLOR
     float3 color = bloomParams.z < 1.5
         ? bloomDownSample(input.texcoord.xy, bloomParams.z < 0.5)
         : bloomUpSample(input.texcoord.xy);
-    return float4(color, 1.0);
+    return float4(color * bloomParams.w, 1.0);
 }

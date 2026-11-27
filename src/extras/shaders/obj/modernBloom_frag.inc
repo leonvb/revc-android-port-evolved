@@ -1,12 +1,12 @@
 const char *modernBloom_frag_src =
-"// Dual-Kawase bloom building block. This source is not wired into the game yet.\n"
+"// Dual-Kawase bright-pass, downsample and upsample kernels.\n"
 "// Bounds are inclusive texel centers of the valid part of the source texture,\n"
 "// in the source's native texture orientation. v_tex0 is already in that same\n"
 "// orientation; each pass must supply its own orientation and bounds.\n"
 "uniform sampler2D tex0;\n"
 "uniform vec4 u_bloomBounds; // minU, minV, maxU, maxV\n"
 "uniform vec4 u_bloomTexel;  // 1/texture width, 1/texture height, radius, unused\n"
-"uniform vec4 u_bloomParams; // threshold, soft knee, pass (0=bright/down, 1=down, 2=up), unused\n"
+"uniform vec4 u_bloomParams; // threshold, soft knee, pass (0=bright/down, 1=down, 2=up), intensity\n"
 "FSIN vec2 v_tex0;\n"
 
 "vec3 bloomSample(vec2 uv)\n"
@@ -58,6 +58,6 @@ const char *modernBloom_frag_src =
 "    vec3 color = u_bloomParams.z < 1.5\n"
 "        ? bloomDownSample(v_tex0, u_bloomParams.z < 0.5)\n"
 "        : bloomUpSample(v_tex0);\n"
-"    FRAGCOLOR(vec4(color, 1.0));\n"
+"    FRAGCOLOR(vec4(color * u_bloomParams.w, 1.0));\n"
 "}\n"
 ;

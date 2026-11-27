@@ -33,6 +33,11 @@ int main()
 	assert(b[2] == 639.5f/1024 && b[3] == 1023.5f/1024);
 	assert(Bounds(1, 1, 0, 0, 1, 1, b));
 	assert(b[0] == b[2] && b[1] == b[3]);
+	assert(NightFactor(12, 0) == 0.35f);
+	assert(NightFactor(23, 0) == 1.0f);
+	assert(NightFactor(6, 0) > NightFactor(7, 0));
+	assert(NightFactor(19, 0) > NightFactor(18, 0));
+	assert(NightFactor(-1, 0) == 0.35f);
 	for(int i = 0; i < 5; ++i){
 		Pass pass = PassAt(i);
 		assert(pass.source != pass.destination);

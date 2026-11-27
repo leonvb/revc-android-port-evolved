@@ -25,11 +25,12 @@ fxaa = (shader_dir / 'modernFXAA.frag').read_text().replace(
     '#include "fxaa311.h"', (shader_dir / 'fxaa311.h').read_text())
 sources['modernFXAA'] = fxaa
 
-bytecode = (shader_dir / "obj/modernAA_PS.cso").read_bytes()
-inc = (shader_dir / "obj/modernAA_PS.inc").read_text()
-embedded = bytes(int(v, 16) for v in re.findall(r'0x([0-9a-fA-F]{2})', inc))
-if bytecode != embedded or bytecode[:4] != bytes.fromhex('0003ffff'):
-    raise SystemExit('modernAA_PS.inc is stale or is not shader model 3 bytecode')
+for name in ('modernAA', 'modernBloom', 'modernFXAA'):
+    bytecode = (shader_dir / ('obj/' + name + '_PS.cso')).read_bytes()
+    inc = (shader_dir / ('obj/' + name + '_PS.inc')).read_text()
+    embedded = bytes(int(v, 16) for v in re.findall(r'0x([0-9a-fA-F]{2})', inc))
+    if bytecode != embedded or bytecode[:4] != bytes.fromhex('0003ffff'):
+        raise SystemExit(name + '_PS.inc is stale or is not shader model 3 bytecode')
 
 
 def load_c_string(path):

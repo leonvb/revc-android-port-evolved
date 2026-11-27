@@ -455,7 +455,7 @@ rasterCreateCameraTexture(Raster *raster)
 	else
 		levels = 1;
 
-	IDirect3DTexture9 *tex;
+	IDirect3DTexture9 *tex = nil;
 	d3ddevice->CreateTexture(raster->width, raster->height,
 				levels,
 				(natras->autogenMipmap ? D3DUSAGE_AUTOGENMIPMAP : 0) | D3DUSAGE_RENDERTARGET,
