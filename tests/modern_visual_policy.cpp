@@ -2,6 +2,7 @@
 #include <cassert>
 #include <cmath>
 #include <limits>
+#include <initializer_list>
 
 int main()
 {
@@ -33,6 +34,16 @@ int main()
 		if(!KeepPreviousLod(prior, selected, distance, 100.0f)) prior = selected;
 		assert(prior == 0);
 	}
+	// The normal horizon grows, but the priority wedge retains the camera's
+	// original FOV/Display-scaled distance, including when the far clip caps.
+	for(float classicDistance : {180.0f, 360.0f, 660.0f}){
+		for(float modern : {1.0f, 2.2f, 4.0f}){
+			float extended = classicDistance * modern;
+			assert(std::fabs(PriorityLodDistance(extended, modern) - classicDistance) < 0.001f);
+		}
+	}
+	assert(PriorityLodDistance(360.0f, 0.0f) == 360.0f);
+	assert(PriorityLodDistance(360.0f, std::numeric_limits<float>::quiet_NaN()) == 360.0f);
 	assert(GenerationMultiplier(1.0f) == 1.0f);
 	assert(GenerationMultiplier(4.0f) == 1.375f);
 	for (unsigned int frame = 0; frame != 16; ++frame) {

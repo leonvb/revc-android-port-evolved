@@ -30,7 +30,11 @@ GPU and actual device memory pressure still need assessment.
 - Compare Classic/master-off and Modern at 1×, 2.2× and 4× across clear, foggy
   and rainy weather, including interiors, cutscenes, scripted cameras, aircraft,
   bridges and island transitions. Check clipping, fade/pop-in, fog and missing
-  geometry as well as save/reload and live menu changes.
+  geometry as well as save/reload and live menu changes. The narrow priority
+  streaming wedge now retains its Classic size at higher Modern distances,
+  while the ordinary scan still reaches the extended horizon. Verify loading
+  and any stationary LOD flicker at high settings on-device; this change does
+  not eliminate depth fighting, resource pressure or all model overlap.
 - Inspect traffic and pedestrians near and far (including player surroundings),
   mission/script behavior, culling, startup spawning and pool pressure. The
   current change does not independently configure each generator or guarantee

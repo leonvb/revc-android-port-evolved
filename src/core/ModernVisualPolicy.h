@@ -30,6 +30,13 @@ inline bool KeepPreviousLod(int previous, int selected, float distance, float bo
 	const float band = boundary < 100.0f ? 1.0f : 2.0f;
 	return distance >= boundary - band && distance <= boundary + band;
 }
+// The narrow priority frustum protects nearby streaming requests. Extending it
+// along with the visual horizon lets many distant requests monopolize the
+// limited queue; retain the original camera/FOV and Display scaling instead.
+inline float PriorityLodDistance(float extendedDistance, float modernLod)
+{
+	return extendedDistance / LodMultiplier(true, modernLod);
+}
 inline float GenerationMultiplier(float lod)
 {
 	// Keep spawn rings within the fixed-size ped/vehicle pools. Applying the
