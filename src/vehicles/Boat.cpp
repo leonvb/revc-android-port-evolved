@@ -29,6 +29,10 @@
 #include "Shadows.h"
 #include "Wanted.h"
 #include "SaveBuf.h"
+#ifdef MODERN_FEATURES
+#include "ModernConfig.h"
+#include "ModernVehiclePhysics.h"
+#endif
 
 #define INVALID_ORIENTATION (-9999.99f)
 
@@ -350,11 +354,22 @@ CBoat::ProcessControl(void)
 			   GetForward().z < -0.5f && GetUp().z > -0.5f && m_vecMoveSpeed.z < -0.15f &&
 			   buoyanceImpulse.z > 0.01f*m_fMass * GRAVITY*CTimer::GetTimeStep() &&
 			   buoyanceImpulse.z < 0.4f*m_fMass * GRAVITY*CTimer::GetTimeStep()){
+#ifdef MODERN_FEATURES
+				const bool bModernBoatFix = CModernConfig::IsHighFpsPhysicsFixEnabled();
+				float skimmerStep = bModernBoatFix ? CTimer::GetBaseTimeStep30() : CTimer::GetTimeStep();
+				float turnImpulse = -0.00017f*GetForward().z*buoyanceImpulse.z * m_fMass*skimmerStep;
+#else
 				float turnImpulse = -0.00017f*GetForward().z*buoyanceImpulse.z * m_fMass*CTimer::GetTimeStep();
+#endif
 				ApplyTurnForce(turnImpulse*GetForward(), GetUp());
 				bBoatInWater = false;
 				//BUG? aren't we forgetting the timestep here?
+#ifdef MODERN_FEATURES
+				float moveImpulse = -0.5f*DotProduct(m_vecMoveSpeed, GetForward()) * m_fMass *
+					(bModernBoatFix ? CTimer::GetTimeStepRatio30() : 1.0f);
+#else
 				float moveImpulse = -0.5f*DotProduct(m_vecMoveSpeed, GetForward()) * m_fMass;
+#endif
 				ApplyMoveForce(moveImpulse*GetForward());
 				if(m_skimmerThingTimer == 0.0f)
 					m_skimmerThingTimer = CTimer::GetTimeInMilliseconds() + 300.0f;
@@ -363,7 +378,14 @@ CBoat::ProcessControl(void)
 			}
 
 		if(!onLand && bBoatInWater && GetUp().z > 0.0f){
+#ifdef MODERN_FEATURES
+			// buoyanceImpulse.z already includes * CTimer::GetTimeStep() from cBuoyancy::ProcessBuoyancyBoat;
+			// multiplying by GetTimeStep() again caused dt^2 scaling (4x weaker aquaplaning lift at 120 FPS, burying hulls in water).
+			float aqStep = CModernConfig::IsHighFpsPhysicsFixEnabled() ? CTimer::GetBaseTimeStep30() : CTimer::GetTimeStep();
+			float impulse = m_vecMoveSpeed.MagnitudeSqr()*pBoatHandling->fAqPlaneForce*buoyanceImpulse.z*aqStep*0.5f;
+#else
 			float impulse = m_vecMoveSpeed.MagnitudeSqr()*pBoatHandling->fAqPlaneForce*buoyanceImpulse.z*CTimer::GetTimeStep()*0.5f;
+#endif
 			if(GetModelIndex() == MI_SKIMMER)
 				impulse *= 1.0f + m_fGasPedal;
 			else if(m_fGasPedal > 0.05f)
@@ -513,7 +535,14 @@ CBoat::ProcessControl(void)
 			float fz = Pow(pBoatHandling->vecTurnRes.z, CTimer::GetTimeStep());
 			m_vecTurnSpeed = Multiply3x3(m_vecTurnSpeed, GetMatrix());	// invert - to local space
 			// TODO: figure this out
+#ifdef MODERN_FEATURES
+			float rollDamp = 1.0f/(1000.0f * SQR(m_vecTurnSpeed.x) + 1.0f);
+			if(CModernConfig::IsHighFpsPhysicsFixEnabled())
+				rollDamp = CTimer::PowTimeStep(rollDamp);
+			float magic = rollDamp * fx;
+#else
 			float magic = 1.0f/(1000.0f * SQR(m_vecTurnSpeed.x) + 1.0f) * fx;
+#endif
 			m_vecTurnSpeed.y *= fy;
 			m_vecTurnSpeed.z *= fz;
 			float forceUp = (magic - 1.0f) * m_vecTurnSpeed.x * m_fTurnMass;
@@ -522,7 +551,15 @@ CBoat::ProcessControl(void)
 			ApplyTurnForce(forceUp*GetUp(), com + GetForward());
 		}
 
-		m_nDeltaVolumeUnderWater = (m_fVolumeUnderWater-m_fPrevVolumeUnderWater)*10000;
+#ifdef MODERN_FEATURES
+		if(CModernConfig::IsHighFpsPhysicsFixEnabled()){
+			float invRatio30 = 1.0f / Max(CTimer::GetTimeStepRatio30(), 0.05f);
+			m_nDeltaVolumeUnderWater = (int16)((m_fVolumeUnderWater - m_fPrevVolumeUnderWater) * 10000.0f * invRatio30);
+		}else
+#endif
+		{
+			m_nDeltaVolumeUnderWater = (m_fVolumeUnderWater-m_fPrevVolumeUnderWater)*10000;
+		}
 
 		// Falling into water
 		if(!onLand && bBoatInWater && GetUp().z > 0.0f){
@@ -531,12 +568,17 @@ CBoat::ProcessControl(void)
 				DMAudio.PlayOneShot(m_audioEntityId, SOUND_CAR_SPLASH, splashVol);
 
 			if(m_nDeltaVolumeUnderWater > 200){
-				float speedUp = m_vecMoveSpeed.MagnitudeSqr() * m_nDeltaVolumeUnderWater * 0.001f;
+#ifdef MODERN_FEATURES
+				float dtRatio = CModernConfig::IsHighFpsPhysicsFixEnabled() ? CTimer::GetTimeStepRatio30() : 1.0f;
+#else
+				float dtRatio = 1.0f;
+#endif
+				float speedUp = m_vecMoveSpeed.MagnitudeSqr() * m_nDeltaVolumeUnderWater * 0.001f * dtRatio;
 				if(speedUp + m_vecMoveSpeed.z > pHandling->fBrakeDeceleration)
 					speedUp = pHandling->fBrakeDeceleration - m_vecMoveSpeed.z;
 				if(speedUp < 0.0f) speedUp = 0.0f;
 				float speedFwd = DotProduct(m_vecMoveSpeed, GetForward());
-				speedFwd *= -m_nDeltaVolumeUnderWater * 0.01f * pHandling->fBrakeBias;
+				speedFwd *= -m_nDeltaVolumeUnderWater * 0.01f * pHandling->fBrakeBias * dtRatio;
 				CVector speed = speedFwd*GetForward() + CVector(0.0f, 0.0f, speedUp);
 				CVector splashImpulse = speed * m_fMass;
 				ApplyMoveForce(splashImpulse);
@@ -546,7 +588,12 @@ CBoat::ProcessControl(void)
 
 		// Splashes
 		float speed = m_vecMoveSpeed.Magnitude();
-		if(speed > 0.05f && GetUp().x > 0.0f && !TheCamera.GetLookingForwardFirstPerson() && IsVisible() &&
+#ifdef MODERN_FEATURES
+		const int32 boatSplashTicks = CModernVehiclePhysics::ConsumeBoatSplashTicks(this);
+#else
+		const int32 boatSplashTicks = 1;
+#endif
+		if(boatSplashTicks > 0 && speed > 0.05f && GetUp().x > 0.0f && !TheCamera.GetLookingForwardFirstPerson() && IsVisible() &&
 		   (AutoPilot.m_nCarMission != MISSION_CRUISE || (CTimer::GetFrameCounter()&2) == 0)){
 			CVector splashPos, splashDir;
 			float splashSize, front, waterLevel;
@@ -682,7 +729,12 @@ CBoat::ProcessControl(void)
 		}
 
 		// Spray waterdrops on screen
-		if(TheCamera.GetLookingForwardFirstPerson() && FindPlayerVehicle() && FindPlayerVehicle()->IsBoat() &&
+#ifdef MODERN_FEATURES
+		const int32 boatDropTicks = CModernVehiclePhysics::ConsumeBoatWaterDropTicks(this);
+#else
+		const int32 boatDropTicks = 1;
+#endif
+		if(boatDropTicks > 0 && TheCamera.GetLookingForwardFirstPerson() && FindPlayerVehicle() && FindPlayerVehicle()->IsBoat() &&
 		   m_nDeltaVolumeUnderWater > 0 && numWaterDropOnScreen < 20){
 			CVector dropPos;
 			CVector dropDir(CGeneral::GetRandomNumberInRange(-0.25f, 0.25f), CGeneral::GetRandomNumberInRange(1.0f, 0.75f), 0.0f);
@@ -770,18 +822,36 @@ CBoat::ProcessControlInputs(uint8 pad)
 	if(m_nPadID > 3)
 		m_nPadID = 3;
 
-	m_fBrake += (CPad::GetPad(pad)->GetBrake()/255.0f - m_fBrake)*0.1f;
-	m_fBrake = Clamp(m_fBrake, 0.0f, 1.0f);
+#ifdef MODERN_FEATURES
+	if(CModernConfig::IsHighFpsPhysicsFixEnabled()){
+		m_fBrake = CTimer::ExpSmooth(m_fBrake, CPad::GetPad(pad)->GetBrake()/255.0f, 0.1f);
+		m_fBrake = Clamp(m_fBrake, 0.0f, 1.0f);
 
-	if(m_fBrake < 0.05f){
-		m_fBrake = 0.0f;
-		m_fAccelerate += (CPad::GetPad(pad)->GetAccelerate()/255.0f - m_fAccelerate)*0.1f;
-		m_fAccelerate = Clamp(m_fAccelerate, 0.0f, 1.0f);
+		if(m_fBrake < 0.05f){
+			m_fBrake = 0.0f;
+			m_fAccelerate = CTimer::ExpSmooth(m_fAccelerate, CPad::GetPad(pad)->GetAccelerate()/255.0f, 0.1f);
+			m_fAccelerate = Clamp(m_fAccelerate, 0.0f, 1.0f);
+		}else
+			m_fAccelerate = -m_fBrake*0.3f;
+
+		m_fSteeringLeftRight = CTimer::ExpSmooth(m_fSteeringLeftRight, -CPad::GetPad(pad)->GetSteeringLeftRight()/128.0f, 0.2f);
+		m_fSteeringLeftRight = Clamp(m_fSteeringLeftRight, -1.0f, 1.0f);
 	}else
-		m_fAccelerate = -m_fBrake*0.3f;
+#endif
+	{
+		m_fBrake += (CPad::GetPad(pad)->GetBrake()/255.0f - m_fBrake)*0.1f;
+		m_fBrake = Clamp(m_fBrake, 0.0f, 1.0f);
 
-	m_fSteeringLeftRight += (-CPad::GetPad(pad)->GetSteeringLeftRight()/128.0f - m_fSteeringLeftRight)*0.2f;
-	m_fSteeringLeftRight = Clamp(m_fSteeringLeftRight, -1.0f, 1.0f);
+		if(m_fBrake < 0.05f){
+			m_fBrake = 0.0f;
+			m_fAccelerate += (CPad::GetPad(pad)->GetAccelerate()/255.0f - m_fAccelerate)*0.1f;
+			m_fAccelerate = Clamp(m_fAccelerate, 0.0f, 1.0f);
+		}else
+			m_fAccelerate = -m_fBrake*0.3f;
+
+		m_fSteeringLeftRight += (-CPad::GetPad(pad)->GetSteeringLeftRight()/128.0f - m_fSteeringLeftRight)*0.2f;
+		m_fSteeringLeftRight = Clamp(m_fSteeringLeftRight, -1.0f, 1.0f);
+	}
 
 	float steeringSq = m_fSteeringLeftRight < 0.0f ? -SQR(m_fSteeringLeftRight) : SQR(m_fSteeringLeftRight);
 	m_fSteerAngle = pHandling->fSteeringLock * DEGTORAD(steeringSq);
@@ -805,18 +875,31 @@ CBoat::ApplyWaterResistance(void)
 	float fz = Pow(pBoatHandling->vecMoveRes.z/magic, 0.5f*CTimer::GetTimeStep());
 
 	m_vecMoveSpeed = Multiply3x3(m_vecMoveSpeed, GetMatrix());	// invert - to local space
+	float prevMoveSpeedY = m_vecMoveSpeed.y;
 	m_vecMoveSpeed.x *= fx;
 	m_vecMoveSpeed.y *= fy;
 	m_vecMoveSpeed.z *= fz;
+#ifdef MODERN_FEATURES
+	// Using pre-damped m_vecMoveSpeed.y makes (fy - 1) * v_y telescoping across substeps (frame-rate independent)
+	float force = (fy - 1.0f) * (CModernConfig::IsHighFpsPhysicsFixEnabled() ? prevMoveSpeedY : m_vecMoveSpeed.y) * m_fMass;
+#else
+	(void)prevMoveSpeedY;
 	float force = (fy - 1.0f) * m_vecMoveSpeed.y * m_fMass;
+#endif
 	m_vecMoveSpeed = Multiply3x3(GetMatrix(), m_vecMoveSpeed);	// back to world
 
 	ApplyTurnForce(force*GetForward(), -GetUp());
 
 	if(m_vecMoveSpeed.z > 0.0f)
 		m_vecMoveSpeed.z *= fz;
-	else
-		m_vecMoveSpeed.z *= (1.0f - fz)*0.5f + fz;
+	else{
+#ifdef MODERN_FEATURES
+		if(CModernConfig::IsHighFpsPhysicsFixEnabled())
+			m_vecMoveSpeed.z *= Sqrt(fz);
+		else
+#endif
+			m_vecMoveSpeed.z *= (1.0f - fz)*0.5f + fz;
+	}
 }
 
 RwObject*

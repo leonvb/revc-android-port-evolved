@@ -20,6 +20,9 @@
 #include "Bike.h"
 #include "Pickups.h"
 #include "Physical.h"
+#ifdef MODERN_FEATURES
+#include "ModernConfig.h"
+#endif
 
 #ifdef WALLCLIMB_CHEAT
 bool gGravityCheat;
@@ -371,23 +374,51 @@ CPhysical::ProcessControl(void)
 	if(!bIsStuck){
 		if(IsObject() ||
 		   IsPed() && !bPedPhysics){
-			m_vecMoveSpeedAvg = (m_vecMoveSpeedAvg + m_vecMoveSpeed)/2.0f;
-			m_vecTurnSpeedAvg = (m_vecTurnSpeedAvg + m_vecTurnSpeed)/2.0f;
-			float step = CTimer::GetTimeStep() * 0.003f;
-			if(m_vecMoveSpeedAvg.MagnitudeSqr() < step*step &&
-			   m_vecTurnSpeedAvg.MagnitudeSqr() < step*step){
-				m_nStaticFrames++;
-				if(m_nStaticFrames > 10){
-					m_nStaticFrames = 10;
-					SetIsStatic(true);
-					m_vecMoveSpeed = CVector(0.0f, 0.0f, 0.0f);
-					m_vecTurnSpeed = CVector(0.0f, 0.0f, 0.0f);
-					m_vecMoveFriction = m_vecMoveSpeed;
-					m_vecTurnFriction = m_vecTurnSpeed;
-					return;
-				}
-			}else 
-				m_nStaticFrames = 0;
+#ifdef MODERN_FEATURES
+			if(CModernConfig::IsHighFpsPhysicsFixEnabled()){
+				float blend = CTimer::ExpDecayFactor(0.5f);
+				m_vecMoveSpeedAvg += (m_vecMoveSpeed - m_vecMoveSpeedAvg) * blend;
+				m_vecTurnSpeedAvg += (m_vecTurnSpeed - m_vecTurnSpeedAvg) * blend;
+				float step = CTimer::GetBaseTimeStep30() * 0.003f;
+				if(m_vecMoveSpeedAvg.MagnitudeSqr() < step*step &&
+				   m_vecTurnSpeedAvg.MagnitudeSqr() < step*step){
+#ifdef FIX_BUGS
+					m_nStaticFrames += CTimer::GetLogicalFramesPassed();
+#else
+					m_nStaticFrames++;
+#endif
+					if(m_nStaticFrames > 10){
+						m_nStaticFrames = 10;
+						SetIsStatic(true);
+						m_vecMoveSpeed = CVector(0.0f, 0.0f, 0.0f);
+						m_vecTurnSpeed = CVector(0.0f, 0.0f, 0.0f);
+						m_vecMoveFriction = m_vecMoveSpeed;
+						m_vecTurnFriction = m_vecTurnSpeed;
+						return;
+					}
+				}else
+					m_nStaticFrames = 0;
+			}else
+#endif
+			{
+				m_vecMoveSpeedAvg = (m_vecMoveSpeedAvg + m_vecMoveSpeed)/2.0f;
+				m_vecTurnSpeedAvg = (m_vecTurnSpeedAvg + m_vecTurnSpeed)/2.0f;
+				float step = CTimer::GetTimeStep() * 0.003f;
+				if(m_vecMoveSpeedAvg.MagnitudeSqr() < step*step &&
+				   m_vecTurnSpeedAvg.MagnitudeSqr() < step*step){
+					m_nStaticFrames++;
+					if(m_nStaticFrames > 10){
+						m_nStaticFrames = 10;
+						SetIsStatic(true);
+						m_vecMoveSpeed = CVector(0.0f, 0.0f, 0.0f);
+						m_vecTurnSpeed = CVector(0.0f, 0.0f, 0.0f);
+						m_vecMoveFriction = m_vecMoveSpeed;
+						m_vecTurnFriction = m_vecTurnSpeed;
+						return;
+					}
+				}else
+					m_nStaticFrames = 0;
+			}
 		}
 	}
 	ApplyGravity();
@@ -572,7 +603,12 @@ CPhysical::ApplyAirResistance(void)
 	}else if(GetStatus() != STATUS_GHOST){ 
 		float f = Pow(1.0f/Abs(1.0f + m_fAirResistance*0.5f*m_vecMoveSpeed.MagnitudeSqr()), CTimer::GetTimeStep());
 		m_vecMoveSpeed *= f;
-		m_vecTurnSpeed *= 0.99f;
+#ifdef MODERN_FEATURES
+		if(CModernConfig::IsHighFpsPhysicsFixEnabled())
+			m_vecTurnSpeed *= CTimer::PowTimeStep(0.99f);
+		else
+#endif
+			m_vecTurnSpeed *= 0.99f;
 	}
 }
 
@@ -1226,9 +1262,22 @@ CPhysical::ApplyFriction(float adhesiveLimit, CColPoint &colpoint)
 			if(fOtherSpeed > 0.1f &&
 			   colpoint.surfaceB != SURFACE_GRASS && colpoint.surfaceB != SURFACE_MUD_DRY &&
 			   CSurfaceTable::GetAdhesionGroup(colpoint.surfaceA) == ADHESIVE_HARD){
-				CVector v = frictionDir * fOtherSpeed * 0.25f;
-				for(int i = 0; i < 4; i++)
-					CParticle::AddParticle(PARTICLE_SPARK_SMALL, colpoint.point, v);
+#ifdef MODERN_FEATURES
+				bool emitSparks = true;
+				if(CModernConfig::IsHighFpsPhysicsFixEnabled()){
+#ifdef FIX_BUGS
+					emitSparks = CTimer::GetLogicalFramesPassed() > 0;
+#else
+					emitSparks = CGeneral::GetRandomNumberInRange(0.0f, 1.0f) < CTimer::GetTimeStepRatio30();
+#endif
+				}
+				if(emitSparks)
+#endif
+				{
+					CVector v = frictionDir * fOtherSpeed * 0.25f;
+					for(int i = 0; i < 4; i++)
+						CParticle::AddParticle(PARTICLE_SPARK_SMALL, colpoint.point, v);
+				}
 			}
 			return true;
 		}

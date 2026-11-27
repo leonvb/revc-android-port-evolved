@@ -33,6 +33,10 @@
 #include "Weather.h"
 #include "Coronas.h"
 #include "SaveBuf.h"
+#ifdef MODERN_FEATURES
+#include "ModernConfig.h"
+#include "ModernVehiclePhysics.h"
+#endif
 
 bool CVehicle::bWheelsOnlyCheat;
 bool CVehicle::bAllDodosCheat;
@@ -185,10 +189,16 @@ CVehicle::CVehicle(uint8 CreatedBy)
 	AutoPilot.m_bStayInCurrentLevel = false;
 	AutoPilot.m_bIgnorePathfinding = false;
 	AutoPilot.m_nSwitchDistance = 20;
+#ifdef MODERN_FEATURES
+	CModernVehiclePhysics::ResetVehicle(this);
+#endif
 }
 
 CVehicle::~CVehicle()
 {
+#ifdef MODERN_FEATURES
+	CModernVehiclePhysics::ResetVehicle(this);
+#endif
 	m_nAlarmState = 0;
 	if (m_audioEntityId >= 0){
 		DMAudio.DestroyEntity(m_audioEntityId);
@@ -406,7 +416,12 @@ CVehicle::FlyingControl(eFlightModel flightModel)
 		CVector vecStabilise = (GetUp().z > 0.0f) ? vecFRight : -vecFRight;
 		float fStabiliseDirection = (GetRight().z > 0.0f) ? -1.0f : 1.0f;
 		float fStabiliseSpeed = pFlyingHandling->fRollStab * fStabiliseDirection * (1.0f - DotProduct(GetRight(), vecStabilise)) * (1.0f - Abs(GetForward().z));
+#ifdef MODERN_FEATURES
+		float stabScale = CModernConfig::IsHighFpsPhysicsFixEnabled() ? CTimer::GetTimeStepRatio30() : 1.0f;
+		ApplyTurnForce(fStabiliseSpeed * m_fTurnMass * stabScale * GetRight(), GetUp());
+#else
 		ApplyTurnForce(fStabiliseSpeed * m_fTurnMass * GetRight(), GetUp()); // no CTimer::GetTimeStep(), is it right?
+#endif
 
 		// up/down
 		float fTail = -DotProduct(GetSpeed(vecTail), GetUp());
@@ -435,7 +450,14 @@ CVehicle::FlyingControl(eFlightModel flightModel)
 		float rZ = Pow(vecResistance.z, CTimer::GetTimeStep());
 		CVector vecTurnSpeed = Multiply3x3(m_vecTurnSpeed, GetMatrix());
 		vecTurnSpeed.x *= rX;
+#ifdef MODERN_FEATURES
+		float rollSpeedRes = 1.0f / (pFlyingHandling->vecSpeedRes.y * SQR(vecTurnSpeed.y) + 1.0f);
+		if(CModernConfig::IsHighFpsPhysicsFixEnabled())
+			rollSpeedRes = CTimer::PowTimeStep(rollSpeedRes);
+		float fResistance = vecTurnSpeed.y * rollSpeedRes * rY - vecTurnSpeed.y;
+#else
 		float fResistance = vecTurnSpeed.y * (1.0f / (pFlyingHandling->vecSpeedRes.y * SQR(vecTurnSpeed.y) + 1.0f)) * rY - vecTurnSpeed.y;
+#endif
 		vecTurnSpeed.z *= rZ;
 		m_vecTurnSpeed = Multiply3x3(GetMatrix(), vecTurnSpeed);
 		ApplyTurnForce(-GetUp() * fResistance * m_fTurnMass, GetRight() + Multiply3x3(GetMatrix(), m_vecCentreOfMass));
@@ -540,7 +562,15 @@ CVehicle::FlyingControl(eFlightModel flightModel)
 		float rY = Pow(flyingHandling->vecTurnRes.y, CTimer::GetTimeStep());
 		float rZ = Pow(flyingHandling->vecTurnRes.z, CTimer::GetTimeStep());
 		CVector vecTurnSpeed = Multiply3x3(m_vecTurnSpeed, GetMatrix());
+#ifdef MODERN_FEATURES
+		float fResistanceMultiplier;
+		if(CModernConfig::IsHighFpsPhysicsFixEnabled())
+			fResistanceMultiplier = CTimer::PowTimeStep(1.0f / (flyingHandling->vecSpeedRes.z * SQR(vecTurnSpeed.z) + 1.0f)) * rZ;
+		else
+			fResistanceMultiplier = Pow(1.0f / (flyingHandling->vecSpeedRes.z * SQR(vecTurnSpeed.z) + 1.0f) * rZ, CTimer::GetTimeStep());
+#else
 		float fResistanceMultiplier = Pow(1.0f / (flyingHandling->vecSpeedRes.z * SQR(vecTurnSpeed.z) + 1.0f) * rZ, CTimer::GetTimeStep());
+#endif
 		float fResistance = vecTurnSpeed.z * fResistanceMultiplier - vecTurnSpeed.z;
 		vecTurnSpeed.x *= rX;
 		vecTurnSpeed.y *= rY;
@@ -804,6 +834,10 @@ CVehicle::ProcessWheel(CVector &wheelFwd, CVector &wheelRight, CVector &wheelCon
 		bAlreadySkidding = true;
 	*wheelState = WHEEL_STATE_NORMAL;
 
+#ifdef MODERN_FEATURES
+	if(IsCar() && CModernConfig::IsModernDrivingEnabled())
+		adhesion *= CModernVehiclePhysics::GetCarWheelLoadScale((CAutomobile*)this, wheelId);
+#endif
 	adhesion *= CTimer::GetTimeStep();
 	if(bAlreadySkidding)
 		adhesion *= pHandling->fTractionLoss;
@@ -818,11 +852,29 @@ CVehicle::ProcessWheel(CVector &wheelFwd, CVector &wheelRight, CVector &wheelCon
 		// fixing this causes jittery cars at 15fps, and causes the car to move backwards slowly at 18fps
 		// at 19fps, the effects are gone ...
 		//right *= CTimer::GetTimeStepFix();
+#ifdef MODERN_FEATURES
+		// At >30 FPS, adhesion scales down with dt while raw right does not, triggering premature
+		// WHEEL_STATE_SKIDDING/fTractionLoss and 4x stiffer sub-limit lateral snap. Clamping <= 1.0f
+		// preserves 30 FPS behavior and avoids the <20 FPS overshoot noted above.
+		if(CModernConfig::IsHighFpsPhysicsFixEnabled())
+			right *= Min(CTimer::GetTimeStepRatio30(), 1.0f);
+#endif
 
 		if(wheelStatus == WHEEL_STATUS_BURST){
 			float fwdspeed = Min(contactSpeedFwd, fBurstSpeedMax);
-			right += fwdspeed * CGeneral::GetRandomNumberInRange(-fBurstTyreMod, fBurstTyreMod);
+			right += fwdspeed * CGeneral::GetRandomNumberInRange(-fBurstTyreMod, fBurstTyreMod)
+#ifdef MODERN_FEATURES
+				* (CModernConfig::IsHighFpsPhysicsFixEnabled() ? Min(CTimer::GetTimeStepRatio30(), 1.0f) : 1.0f)
+#endif
+				;
 		}
+#ifdef MODERN_FEATURES
+		if(CModernConfig::IsModernDrivingEnabled()){
+			bool bIsRear = (wheelId == CARWHEEL_REAR_LEFT || wheelId == CARWHEEL_REAR_RIGHT);
+			right = CModernVehiclePhysics::ComputeModernLateralForce(
+				this, right, contactSpeedFwd, contactSpeedRight, adhesion, bAlreadySkidding, bIsRear);
+		}
+#endif
 	}
 
 	if(bDriving){
@@ -843,6 +895,10 @@ CVehicle::ProcessWheel(CVector &wheelFwd, CVector &wheelRight, CVector &wheelCon
 		// so we probably have to fix this
 		// better get rid of it here too
 		//fwd *= CTimer::GetTimeStepFix();
+#endif
+#ifdef MODERN_FEATURES
+		if(CModernConfig::IsHighFpsPhysicsFixEnabled())
+			fwd *= Min(CTimer::GetTimeStepRatio30(), 1.0f);
 #endif
 
 		if(!bBraking){
@@ -886,6 +942,10 @@ CVehicle::ProcessWheel(CVector &wheelFwd, CVector &wheelRight, CVector &wheelCon
 
 		float l = Sqrt(speedSq);
 		float tractionLoss = bAlreadySkidding ? 1.0f : pHandling->fTractionLoss;
+#ifdef MODERN_FEATURES
+		if(!bAlreadySkidding && CModernConfig::IsModernDrivingEnabled())
+			tractionLoss = lerp(0.35f, pHandling->fTractionLoss, 1.0f);
+#endif
 		right *= adhesion * tractionLoss / l;
 		fwd *= adhesion * tractionLoss / l;
 	}
@@ -962,6 +1022,10 @@ CVehicle::ProcessBikeWheel(CVector &wheelFwd, CVector &wheelRight, CVector &whee
 		bAlreadySkidding = true;
 	*wheelState = WHEEL_STATE_NORMAL;
 
+#ifdef MODERN_FEATURES
+	if(IsBike() && CModernConfig::IsModernDrivingEnabled())
+		adhesion *= CModernVehiclePhysics::GetBikeWheelLoadScale((CBike*)this, wheelId);
+#endif
 	adhesion *= CTimer::GetTimeStep();
 	if(bAlreadySkidding)
 		adhesion *= pHandling->fTractionLoss;
@@ -981,11 +1045,26 @@ CVehicle::ProcessBikeWheel(CVector &wheelFwd, CVector &wheelRight, CVector &whee
 		// see above
 		//right *= CTimer::GetTimeStepFix();
 #endif
+#ifdef MODERN_FEATURES
+		if(CModernConfig::IsHighFpsPhysicsFixEnabled())
+			right *= Min(CTimer::GetTimeStepRatio30(), 1.0f);
+#endif
 
 		if(wheelStatus == WHEEL_STATUS_BURST){
 			float fwdspeed = Min(contactSpeedFwd, fBurstBikeSpeedMax);
-			right += fwdspeed * CGeneral::GetRandomNumberInRange(-fBurstBikeTyreMod, fBurstBikeTyreMod);
+			right += fwdspeed * CGeneral::GetRandomNumberInRange(-fBurstBikeTyreMod, fBurstBikeTyreMod)
+#ifdef MODERN_FEATURES
+				* (CModernConfig::IsHighFpsPhysicsFixEnabled() ? Min(CTimer::GetTimeStepRatio30(), 1.0f) : 1.0f)
+#endif
+				;
 		}
+#ifdef MODERN_FEATURES
+		if(CModernConfig::IsModernDrivingEnabled()){
+			bool bIsRear = (wheelId == BIKEWHEEL_REAR);
+			right = CModernVehiclePhysics::ComputeModernLateralForce(
+				this, right, contactSpeedFwd, contactSpeedRight, adhesion, bAlreadySkidding, bIsRear);
+		}
+#endif
 	}
 
 	if(bDriving){
@@ -1006,6 +1085,10 @@ CVehicle::ProcessBikeWheel(CVector &wheelFwd, CVector &wheelRight, CVector &whee
 		// so we probably have to fix this
 		// see above
 		//fwd *= CTimer::GetTimeStepFix();
+#endif
+#ifdef MODERN_FEATURES
+		if(CModernConfig::IsHighFpsPhysicsFixEnabled())
+			fwd *= Min(CTimer::GetTimeStepRatio30(), 1.0f);
 #endif
 
 		if(!bBraking){
@@ -1049,6 +1132,10 @@ CVehicle::ProcessBikeWheel(CVector &wheelFwd, CVector &wheelRight, CVector &whee
 
 		float l = Sqrt(speedSq);
 		float tractionLoss = bAlreadySkidding ? 1.0f : pHandling->fTractionLoss;
+#ifdef MODERN_FEATURES
+		if(!bAlreadySkidding && CModernConfig::IsModernDrivingEnabled())
+			tractionLoss = lerp(0.35f, pHandling->fTractionLoss, 1.0f);
+#endif
 		right *= adhesion * tractionLoss / l;
 		fwd *= adhesion * tractionLoss / l;
 
