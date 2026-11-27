@@ -111,6 +111,9 @@ public:
 	static bool ShouldWaitVSyncInGameplay();
 	static void ApplyFrameRateSettings();
 
+	// Phase 6: master-off and invalid values must always behave like Classic.
+	static float GetLodDistanceMultiplier();
+
 	// Phase 1 (M1.1 / M1.2) runtime feature predicates
 	static bool IsHighFpsPhysicsFixEnabled() { return m_bMasterEnable != 0 && m_bHighFpsPhysicsFix != 0; }
 	static bool IsModernDrivingEnabled() { return m_bMasterEnable != 0 && m_nDrivingStyle == MODERN_DRIVING_MODERN; }

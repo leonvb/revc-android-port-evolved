@@ -1,5 +1,6 @@
 #include "common.h"
 #include "ModernConfig.h"
+#include "ModernVisualPolicy.h"
 
 #ifdef MODERN_FEATURES
 
@@ -188,13 +189,18 @@ CModernConfig::ClampValues()
 	if (m_fMaxMantleHeight < 0.6f) m_fMaxMantleHeight = 0.6f;
 	if (m_fMaxMantleHeight > 4.0f) m_fMaxMantleHeight = 4.0f;
 
-	if (m_fLodDistMultiplier < 1.0f) m_fLodDistMultiplier = 1.0f;
-	if (m_fLodDistMultiplier > 4.0f) m_fLodDistMultiplier = 4.0f;
+	m_fLodDistMultiplier = ModernVisualPolicy::LodMultiplier(true, m_fLodDistMultiplier);
 	if (m_nNeonBloom < 0 || m_nNeonBloom > 2) m_nNeonBloom = 0;
 	m_bFxaa = m_bFxaa ? 1 : 0;
 	m_bDynamicPointLights = m_bDynamicPointLights ? 1 : 0;
 	m_bWetRoadReflections = m_bWetRoadReflections ? 1 : 0;
 	if (m_nRealtimeShadows < 0 || m_nRealtimeShadows > 2) m_nRealtimeShadows = 0;
+}
+
+float
+CModernConfig::GetLodDistanceMultiplier()
+{
+	return ModernVisualPolicy::LodMultiplier(m_bMasterEnable != 0, m_fLodDistMultiplier);
 }
 
 int32

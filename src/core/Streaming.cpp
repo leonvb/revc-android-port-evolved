@@ -1,4 +1,8 @@
 #include "common.h"
+#if defined(MODERN_FEATURES) && UINTPTR_MAX > UINT32_MAX && !defined(__SWITCH__) && defined(GTA_PC)
+#include "ModernConfig.h"
+#include "ModernVisualPolicy.h"
+#endif
 
 #include "General.h"
 #include "Pad.h"
@@ -73,6 +77,20 @@ int32 CStreaming::ms_imageOffsets[NUMCDIMAGES];
 int32 CStreaming::ms_lastImageRead;
 int32 CStreaming::ms_imageSize;
 size_t CStreaming::ms_memoryAvailable;
+
+#if defined(MODERN_FEATURES) && UINTPTR_MAX > UINT32_MAX && !defined(__SWITCH__) && defined(GTA_PC)
+namespace {
+size_t classicStreamingBudget;
+size_t modernStreamingBudget;
+
+void ApplyModernStreamingBudget()
+{
+	if (classicStreamingBudget)
+		CStreaming::ms_memoryAvailable = CModernConfig::m_bMasterEnable && modernStreamingBudget
+			? modernStreamingBudget : classicStreamingBudget;
+}
+}
+#endif
 
 int32 desiredNumVehiclesLoaded = 12;
 
@@ -226,7 +244,7 @@ CStreaming::Init2(void)
 #ifdef FIX_BUGS
 	// do what gta3 does
 	extern size_t _dwMemAvailPhys;
-	ms_memoryAvailable = (_dwMemAvailPhys - 10*MB)/2;
+	ms_memoryAvailable = _dwMemAvailPhys > 10u*MB ? (_dwMemAvailPhys - 10u*MB)/2 : 65u*MB;
 	if(ms_memoryAvailable < 65*MB)
 		ms_memoryAvailable = 65*MB;
 	// A GPU without S3TC (Mali, Xclipse) holds every streamed texture uncompressed
@@ -242,6 +260,15 @@ CStreaming::Init2(void)
 	debug("Memory allocated to Streaming is %zuMB", ms_memoryAvailable/MB); // original modifier was %d
 #endif
 #undef MB
+#endif
+
+#if defined(MODERN_FEATURES) && UINTPTR_MAX > UINT32_MAX && !defined(__SWITCH__) && defined(GTA_PC)
+	classicStreamingBudget = ms_memoryAvailable;
+	// Use only startup free-memory information already available on desktop and
+	// Android. Retain the existing 65 MB minimum when memory is scarce.
+	extern size_t _dwMemAvailPhys;
+	modernStreamingBudget = ModernVisualPolicy::StreamingBudget(_dwMemAvailPhys);
+	ApplyModernStreamingBudget();
 #endif
 
 	// find island LODs
@@ -328,6 +355,9 @@ CStreaming::Update(void)
 	timeProcessingDFF = 0;
 #endif
 
+#if defined(MODERN_FEATURES) && UINTPTR_MAX > UINT32_MAX && !defined(__SWITCH__) && defined(GTA_PC)
+	ApplyModernStreamingBudget();
+#endif
 	UpdateMemoryUsed();
 
 	if(ms_channelError != -1){
@@ -3087,14 +3117,16 @@ CStreaming::MakeSpaceFor(int32 size)
 #define MB (1024 * 1024)
 	if(ms_memoryAvailable == 0) {
 		extern size_t _dwMemAvailPhys;
-		ms_memoryAvailable = (_dwMemAvailPhys - 10 * MB) / 2;
+		ms_memoryAvailable = _dwMemAvailPhys > 10u * MB ? (_dwMemAvailPhys - 10u * MB) / 2 : 65u * MB;
 		if(ms_memoryAvailable < 65 * MB) ms_memoryAvailable = 65 * MB;
 	}
 #undef MB
 #endif
-	while(ms_memoryUsed >= ms_memoryAvailable - size)
+	// Saturate the target when a single request exceeds the whole budget.
+	size_t target = size > 0 && (size_t)size < ms_memoryAvailable ? ms_memoryAvailable - (size_t)size : (size <= 0 ? ms_memoryAvailable : 0);
+	while(ms_memoryUsed > 0 && ms_memoryUsed >= target)
 		if(!RemoveLeastUsedModel(STREAMFLAGS_20)){
-			DeleteRwObjectsBehindCamera(ms_memoryAvailable - size);
+			DeleteRwObjectsBehindCamera(target);
 			return;
 		}
 }

@@ -1,4 +1,8 @@
 #include "common.h"
+#ifdef MODERN_FEATURES
+#include "ModernConfig.h"
+#include "ModernVisualPolicy.h"
+#endif
 
 #include "main.h"
 #include "Draw.h"
@@ -630,6 +634,14 @@ CCamera::Process(void)
 		LODDistMultiplier = 1.0f;
 	GenerationDistMultiplier = LODDistMultiplier;
 	LODDistMultiplier *= CRenderer::ms_lodDistScale;
+#ifdef MODERN_FEATURES
+	// Keep cinematic cameras and interiors on their original streaming budget.
+	if (!CCutsceneMgr::IsRunning() && !CCutsceneMgr::IsCutsceneProcessing() && !CGame::IsInInterior()) {
+		float modernLod = CModernConfig::GetLodDistanceMultiplier();
+		LODDistMultiplier *= modernLod;
+		GenerationDistMultiplier *= ModernVisualPolicy::GenerationMultiplier(modernLod);
+	}
+#endif
 
 	CDraw::SetNearClipZ(RwCameraGetNearClipPlane(m_pRwCamera));
 	CDraw::SetFarClipZ(RwCameraGetFarClipPlane(m_pRwCamera));

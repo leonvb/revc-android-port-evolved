@@ -563,10 +563,12 @@ psInitialize(void)
 #else
 #ifndef __APPLE__
  	struct sysinfo systemInfo;
-	sysinfo(&systemInfo);
-	_dwMemAvailPhys = systemInfo.freeram;
-	debug("Physical memory size %u\n", systemInfo.totalram);
-	debug("Available physical memory %u\n", systemInfo.freeram);
+	if (sysinfo(&systemInfo) == 0)
+		_dwMemAvailPhys = (size_t)Min((uint64)systemInfo.freeram * systemInfo.mem_unit, (uint64)SIZE_MAX);
+	else
+		_dwMemAvailPhys = 0;
+	debug("Available physical memory %zu bytes\n", _dwMemAvailPhys);
+
 #else
 	uint64_t size = 0;
 	uint64_t page_size = 0;

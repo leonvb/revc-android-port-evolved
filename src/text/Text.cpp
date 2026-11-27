@@ -151,6 +151,7 @@ LookupModernFallbackText(const char *key)
 		{ "FEM_DRV", "DRIVING DYNAMICS" },
 		{ "FEM_MAC", "MID-AIR CAR CONTROL" },
 		{ "FEM_GPS", "GPS RADAR ROUTE" },
+		{ "FEM_LDM", "EXTENDED DRAW DISTANCE" },
 		{ "FEM_ASV", "POST-MISSION AUTOSAVE" },
 		{ "FEM_FIF", "FAST INTERIOR FADES" },
 		{ "FEM_VCM", "MODERN VEHICLE CAMERA" },
