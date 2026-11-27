@@ -500,7 +500,9 @@ BloomRasterAvailable(RwRaster *raster)
 #ifdef RW_D3D9
 	return GETD3DRASTEREXT(raster)->texture != nil;
 #else
-	return true; // GL allocation is checked for framebuffer completeness below.
+	// GL raster creation does not report texture/FBO allocation errors.
+	rw::gl3::Gl3Raster *native = PLUGINOFFSET(rw::gl3::Gl3Raster, raster, rw::gl3::nativeRasterOffset);
+	return native->texid != 0 && native->fbo != 0;
 #endif
 }
 
@@ -508,8 +510,12 @@ static bool
 BloomTargetBound(RwRaster *raster)
 {
 #ifdef RW_OPENGL
-	(void)raster;
-	return glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+	if(!BloomRasterAvailable(raster)) return false;
+	GLint bound = 0;
+	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &bound);
+	rw::gl3::Gl3Raster *native = PLUGINOFFSET(rw::gl3::Gl3Raster, raster, rw::gl3::nativeRasterOffset);
+	return bound != 0 && uint32(bound) == native->fbo &&
+	       glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
 #else
 	if(!BloomRasterAvailable(raster)) return false;
 	IDirect3DSurface9 *expected = nil, *actual = nil;

@@ -49,6 +49,25 @@ enum {
 
 static void *neoVehicle_VS;
 static void *neoVehicle_PS;
+#ifdef MODERN_FEATURES
+static void *modernPed_VS, *modernPedSkin_VS, *modernPed_PS;
+static void *modernVehicle_VS, *modernVehicle_PS;
+static bool
+UseModernLights(rw::Atomic *atomic, void *vs, void *ps)
+{
+	return vs && ps && CModernConfig::m_bMasterEnable && CModernConfig::m_bDynamicPointLights &&
+	       !bRenderingEnvMap && (atomic->geometry->flags & rw::Geometry::NORMALS);
+}
+static void
+UploadModernLights(rw::Atomic *atomic)
+{
+	ModernLightUniforms lights;
+	BuildModernLights(atomic, true, lights);
+	rw::d3d::d3ddevice->SetPixelShaderConstantF(10, &lights.position[0][0], ModernLightingPolicy::MaxLights);
+	rw::d3d::d3ddevice->SetPixelShaderConstantF(18, &lights.color[0][0], ModernLightingPolicy::MaxLights);
+	rw::d3d::d3ddevice->SetPixelShaderConstantF(26, &lights.direction[0][0], ModernLightingPolicy::MaxLights);
+}
+#endif
 
 void
 uploadSpecLights(void)
@@ -480,7 +499,12 @@ rimRenderCB(rw::Atomic *atomic, rw::d3d9::InstanceDataHeader *header)
 	using namespace rw::d3d;
 	using namespace rw::d3d9;
 
-	if(!RimlightEnable){
+#ifdef MODERN_FEATURES
+	bool useModern = UseModernLights(atomic, modernPed_VS, modernPed_PS);
+#else
+	const bool useModern = false;
+#endif
+	if(!RimlightEnable && !useModern){
 		defaultRenderCB_Shader(atomic, header);
 		return;
 	}
@@ -494,9 +518,14 @@ rimRenderCB(rw::Atomic *atomic, rw::d3d9::InstanceDataHeader *header)
 	vsBits = lightingCB_Shader(atomic);
 	uploadMatrices(atomic->getFrame()->getLTM());
 
+#ifdef MODERN_FEATURES
+	if(useModern) UploadModernLights(atomic);
+	setVertexShader(useModern ? modernPed_VS : neoRim_VS);
+#else
 	setVertexShader(neoRim_VS);
+#endif
 
-	uploadRimData(atomic->geometry->flags & Geometry::LIGHT);
+	uploadRimData(RimlightEnable && (atomic->geometry->flags & Geometry::LIGHT));
 
 	InstanceData *inst = header->inst;
 	for(rw::uint32 i = 0; i < header->numMeshes; i++){
@@ -506,6 +535,12 @@ rimRenderCB(rw::Atomic *atomic, rw::d3d9::InstanceDataHeader *header)
 
 		setMaterial(flags, m->color, m->surfaceProps);
 
+#ifdef MODERN_FEATURES
+		if(useModern){
+			d3d::setTexture(0, m->texture ? m->texture : gpWhiteTexture);
+			setPixelShader(modernPed_PS);
+		}else
+#endif
 		if(m->texture){
 			d3d::setTexture(0, m->texture);
 			setPixelShader(default_tex_PS);
@@ -524,7 +559,12 @@ rimSkinRenderCB(rw::Atomic *atomic, rw::d3d9::InstanceDataHeader *header)
 	using namespace rw::d3d;
 	using namespace rw::d3d9;
 
-	if(!RimlightEnable){
+#ifdef MODERN_FEATURES
+	bool useModern = UseModernLights(atomic, modernPedSkin_VS, modernPed_PS);
+#else
+	const bool useModern = false;
+#endif
+	if(!RimlightEnable && !useModern){
 		skinRenderCB(atomic, header);
 		return;
 	}
@@ -541,9 +581,14 @@ rimSkinRenderCB(rw::Atomic *atomic, rw::d3d9::InstanceDataHeader *header)
 
 	uploadSkinMatrices(atomic);
 
+#ifdef MODERN_FEATURES
+	if(useModern) UploadModernLights(atomic);
+	setVertexShader(useModern ? modernPedSkin_VS : neoRimSkin_VS);
+#else
 	setVertexShader(neoRimSkin_VS);
+#endif
 
-	uploadRimData(atomic->geometry->flags & Geometry::LIGHT);
+	uploadRimData(RimlightEnable && (atomic->geometry->flags & Geometry::LIGHT));
 
 	InstanceData *inst = header->inst;
 	for(rw::uint32 i = 0; i < header->numMeshes; i++){
@@ -553,6 +598,12 @@ rimSkinRenderCB(rw::Atomic *atomic, rw::d3d9::InstanceDataHeader *header)
 
 		setMaterial(flags, m->color, m->surfaceProps);
 
+#ifdef MODERN_FEATURES
+		if(useModern){
+			d3d::setTexture(0, m->texture ? m->texture : gpWhiteTexture);
+			setPixelShader(modernPed_PS);
+		}else
+#endif
 		if(inst->material->texture){
 			d3d::setTexture(0, m->texture);
 			setPixelShader(default_tex_PS);
@@ -586,6 +637,14 @@ CreateRimLightPipes(void)
 #include "shaders/obj/neoRimSkin_VS.inc"
 	neoRimSkin_VS = rw::d3d::createVertexShader(neoRimSkin_VS_cso);
 	assert(neoRimSkin_VS);
+#ifdef MODERN_FEATURES
+#include "shaders/obj/modernPed_VS.inc"
+#include "shaders/obj/modernPedSkin_VS.inc"
+#include "shaders/obj/modernPed_PS.inc"
+	modernPed_VS = rw::d3d::createVertexShader(modernPed_VS_cso);
+	modernPedSkin_VS = rw::d3d::createVertexShader(modernPedSkin_VS_cso);
+	modernPed_PS = rw::d3d::createPixelShader(modernPed_PS_cso);
+#endif
 
 
 	rw::d3d9::ObjPipeline *pipe = rw::d3d9::ObjPipeline::create();
@@ -604,6 +663,11 @@ CreateRimLightPipes(void)
 void
 DestroyRimLightPipes(void)
 {
+#ifdef MODERN_FEATURES
+	rw::d3d::destroyVertexShader(modernPed_VS); modernPed_VS = nil;
+	rw::d3d::destroyVertexShader(modernPedSkin_VS); modernPedSkin_VS = nil;
+	rw::d3d::destroyPixelShader(modernPed_PS); modernPed_PS = nil;
+#endif
 	rw::d3d::destroyVertexShader(neoRim_VS);
 	neoRim_VS = nil;
 
@@ -663,13 +727,15 @@ IsTextureTransparent(RwTexture *tex)
 // Render all opaque meshes and put atomics that needs blending
 // into the deferred list.
 void
-AtomicFirstPass(RpAtomic *atomic, int pass)
+AtomicFirstPass(RpAtomic *atomic, int pass, bool road)
 {
 	using namespace rw;
 	using namespace rw::d3d;
 	using namespace rw::d3d9;
 
-	BuildingInst *building = &blendInsts[pass][numBlendInsts[pass]];
+	BuildingInst scratch;
+	const bool hasRoom = numBlendInsts[pass] < (int)ARRAY_SIZE(blendInsts[pass]);
+	BuildingInst *building = hasRoom ? &blendInsts[pass][numBlendInsts[pass]] : &scratch;
 
 	atomic->getPipeline()->instance(atomic);
 	building->instHeader = (d3d9::InstanceDataHeader*)atomic->geometry->instData;
@@ -679,6 +745,15 @@ AtomicFirstPass(RpAtomic *atomic, int pass)
 	building->lighting = !!(atomic->geometry->flags & rw::Geometry::LIGHT);
 	rw::uint32 flags = atomic->geometry->flags;
 
+#ifdef MODERN_FEATURES
+	const bool useModern = CustomPipes::modernWorld_VS && CustomPipes::modernWorld_PS &&
+		CModernConfig::m_bMasterEnable && !CustomPipes::bRenderingEnvMap &&
+		(atomic->geometry->flags & rw::Geometry::NORMALS) &&
+		(CModernConfig::m_bDynamicPointLights || (road && CModernConfig::m_bWetRoadReflections && CWeather::WetRoads > 0.0f));
+#else
+	(void)road;
+	const bool useModern = false;
+#endif
 	bool setupDone = false;
 	bool defer = false;
 	SetMatrix(building, atomic->getFrame()->getLTM());
@@ -698,8 +773,34 @@ AtomicFirstPass(RpAtomic *atomic, int pass)
 			setStreamSource(0, building->instHeader->vertexStream[0].vertexBuffer, 0, building->instHeader->vertexStream[0].stride);
 			setIndices(building->instHeader->indexBuffer);
 			setVertexDeclaration(building->instHeader->vertexDeclaration);
-			setVertexShader(default_amb_VS);
-			d3ddevice->SetVertexShaderConstantF(VSLOC_combined, (float*)&building->combinedMat, 4);
+#ifdef MODERN_FEATURES
+			if(useModern){
+				lightingCB_Shader(atomic);
+				uploadMatrices(atomic->getFrame()->getLTM());
+				setVertexShader(CustomPipes::modernWorld_VS);
+				ModernLightUniforms local;
+				BuildModernLights(atomic, CModernConfig::m_bDynamicPointLights != 0, local);
+				d3ddevice->SetPixelShaderConstantF(10, &local.position[0][0], ModernLightingPolicy::MaxLights);
+				d3ddevice->SetPixelShaderConstantF(18, &local.color[0][0], ModernLightingPolicy::MaxLights);
+				d3ddevice->SetPixelShaderConstantF(26, &local.direction[0][0], ModernLightingPolicy::MaxLights);
+				V3d eye = rw::engine->currentCamera->getFrame()->getLTM()->pos;
+				float eyeData[4] = { eye.x, eye.y, eye.z, 0.0f };
+				bool env = CustomPipes::EnvMapTex && CustomPipes::EnvMapHasFrame && CustomPipes::VehiclePipeSwitch == CustomPipes::VEHICLEPIPE_NEO;
+				float options[4] = { road && CModernConfig::m_bWetRoadReflections ? Min(Max(CWeather::WetRoads, 0.0f), 1.0f) : 0.0f, env ? 1.0f : 0.0f, 0.0f, 0.0f };
+				float sky[4] = { CTimeCycle::GetSkyBottomRed()/255.0f, CTimeCycle::GetSkyBottomGreen()/255.0f, CTimeCycle::GetSkyBottomBlue()/255.0f, 0.0f };
+				float noLightmap[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+				d3ddevice->SetPixelShaderConstantF(1, noLightmap, 1);
+				d3ddevice->SetPixelShaderConstantF(34, options, 1);
+				d3ddevice->SetPixelShaderConstantF(35, sky, 1);
+				d3ddevice->SetPixelShaderConstantF(36, eyeData, 1);
+				d3d::setTexture(1, nil);
+				d3d::setTexture(2, env ? CustomPipes::EnvMapTex : nil);
+			}else
+#endif
+			{
+				setVertexShader(default_amb_VS);
+				d3ddevice->SetVertexShaderConstantF(VSLOC_combined, (float*)&building->combinedMat, 4);
+			}
 			if(building->lighting)
 				setAmbient(pAmbient->color);
 			else
@@ -709,6 +810,12 @@ AtomicFirstPass(RpAtomic *atomic, int pass)
 
 		setMaterial(flags, m->color, m->surfaceProps);
 
+#ifdef MODERN_FEATURES
+		if(useModern){
+			d3d::setTexture(0, m->texture ? m->texture : gpWhiteTexture);
+			setPixelShader(CustomPipes::modernWorld_PS);
+		}else
+#endif
 		if(m->texture){
 			d3d::setTexture(0, m->texture);
 			setPixelShader(default_tex_PS);
@@ -717,7 +824,10 @@ AtomicFirstPass(RpAtomic *atomic, int pass)
 
 		drawInst(building->instHeader, inst);
 	}
-	if(defer)
+#ifdef MODERN_FEATURES
+	if(useModern && setupDone) d3d::setTexture(2, nil);
+#endif
+	if(defer && hasRoom)
 		numBlendInsts[pass]++;
 }
 
@@ -728,7 +838,9 @@ AtomicFullyTransparent(RpAtomic *atomic, int pass, int fadeAlpha)
 	using namespace rw::d3d;
 	using namespace rw::d3d9;
 
-	BuildingInst *building = &blendInsts[pass][numBlendInsts[pass]];
+	BuildingInst scratch;
+	const bool hasRoom = numBlendInsts[pass] < (int)ARRAY_SIZE(blendInsts[pass]);
+	BuildingInst *building = hasRoom ? &blendInsts[pass][numBlendInsts[pass]] : &scratch;
 
 	atomic->getPipeline()->instance(atomic);
 	building->instHeader = (d3d9::InstanceDataHeader*)atomic->geometry->instData;
@@ -737,7 +849,7 @@ AtomicFullyTransparent(RpAtomic *atomic, int pass, int fadeAlpha)
 	building->fadeAlpha = fadeAlpha;
 	building->lighting = !!(atomic->geometry->flags & rw::Geometry::LIGHT);
 	SetMatrix(building, atomic->getFrame()->getLTM());
-	numBlendInsts[pass]++;
+	if(hasRoom) numBlendInsts[pass]++;
 }
 
 void

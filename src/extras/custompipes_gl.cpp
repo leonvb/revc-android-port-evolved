@@ -764,12 +764,14 @@ IsTextureTransparent(RwTexture *tex)
 // Render all opaque meshes and put atomics that needs blending
 // into the deferred list.
 void
-AtomicFirstPass(RpAtomic *atomic, int pass)
+AtomicFirstPass(RpAtomic *atomic, int pass, bool road)
 {
 	using namespace rw;
 	using namespace rw::gl3;
 
-	BuildingInst *building = &blendInsts[pass][numBlendInsts[pass]];
+	BuildingInst scratch;
+	const bool hasRoom = numBlendInsts[pass] < (int)ARRAY_SIZE(blendInsts[pass]);
+	BuildingInst *building = hasRoom ? &blendInsts[pass][numBlendInsts[pass]] : &scratch;
 
 	atomic->getPipeline()->instance(atomic);
 	building->instHeader = (gl3::InstanceDataHeader*)atomic->geometry->instData;
@@ -788,6 +790,15 @@ AtomicFirstPass(RpAtomic *atomic, int pass)
 	else
 		lights.ambient = black;
 
+#ifdef MODERN_FEATURES
+	const bool useModern = CustomPipes::modernWorldShader &&
+		CModernConfig::m_bMasterEnable && !CustomPipes::bRenderingEnvMap &&
+		(atomic->geometry->flags & rw::Geometry::NORMALS) &&
+		(CModernConfig::m_bDynamicPointLights || (road && CModernConfig::m_bWetRoadReflections && CWeather::WetRoads > 0.0f));
+#else
+	(void)road;
+	const bool useModern = false;
+#endif
 	bool setupDone = false;
 	bool defer = false;
 	building->matrix = *atomic->getFrame()->getLTM();
@@ -804,7 +815,28 @@ AtomicFirstPass(RpAtomic *atomic, int pass)
 
 		// alright we're rendering this atomic
 		if(!setupDone){
-			defaultShader->use();
+#ifdef MODERN_FEATURES
+			if(useModern){
+				CustomPipes::modernWorldShader->use();
+				ModernLightUniforms local;
+				BuildModernLights(atomic, CModernConfig::m_bDynamicPointLights != 0, local);
+				glUniform4fv(U(CustomPipes::u_modernPosition), ModernLightingPolicy::MaxLights, &local.position[0][0]);
+				glUniform4fv(U(CustomPipes::u_modernColor), ModernLightingPolicy::MaxLights, &local.color[0][0]);
+				glUniform4fv(U(CustomPipes::u_modernDirection), ModernLightingPolicy::MaxLights, &local.direction[0][0]);
+				V3d eye = rw::engine->currentCamera->getFrame()->getLTM()->pos;
+				glUniform3fv(U(CustomPipes::u_eye), 1, (float*)&eye);
+				bool env = CustomPipes::EnvMapTex && CustomPipes::EnvMapHasFrame && CustomPipes::VehiclePipeSwitch == CustomPipes::VEHICLEPIPE_NEO;
+				float options[4] = { road && CModernConfig::m_bWetRoadReflections ? Min(Max(CWeather::WetRoads, 0.0f), 1.0f) : 0.0f, env ? 1.0f : 0.0f, 0.0f, 0.0f };
+				float sky[4] = { CTimeCycle::GetSkyBottomRed()/255.0f, CTimeCycle::GetSkyBottomGreen()/255.0f, CTimeCycle::GetSkyBottomBlue()/255.0f, 0.0f };
+				float noLightmap[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+				glUniform4fv(U(CustomPipes::u_modernOptions), 1, options);
+				glUniform4fv(U(CustomPipes::u_modernSky), 1, sky);
+				glUniform4fv(U(CustomPipes::u_lightMap), 1, noLightmap);
+				setTexture(1, nil);
+				setTexture(2, env ? CustomPipes::EnvMapTex : nil);
+			}else
+#endif
+				defaultShader->use();
 			setWorldMatrix(&building->matrix);
 			setupVertexInput(building->instHeader);
 			setLights(&lights);
@@ -818,7 +850,10 @@ AtomicFirstPass(RpAtomic *atomic, int pass)
 		drawInst(building->instHeader, inst);
 	}
 	teardownVertexInput(building->instHeader);
-	if(defer)
+#ifdef MODERN_FEATURES
+	if(useModern && setupDone) setTexture(2, nil);
+#endif
+	if(defer && hasRoom)
 		numBlendInsts[pass]++;
 }
 
@@ -828,7 +863,9 @@ AtomicFullyTransparent(RpAtomic *atomic, int pass, int fadeAlpha)
 	using namespace rw;
 	using namespace rw::gl3;
 
-	BuildingInst *building = &blendInsts[pass][numBlendInsts[pass]];
+	BuildingInst scratch;
+	const bool hasRoom = numBlendInsts[pass] < (int)ARRAY_SIZE(blendInsts[pass]);
+	BuildingInst *building = hasRoom ? &blendInsts[pass][numBlendInsts[pass]] : &scratch;
 
 	atomic->getPipeline()->instance(atomic);
 	building->instHeader = (gl3::InstanceDataHeader*)atomic->geometry->instData;
@@ -837,7 +874,7 @@ AtomicFullyTransparent(RpAtomic *atomic, int pass, int fadeAlpha)
 	building->fadeAlpha = fadeAlpha;
 	building->lighting = !!(atomic->geometry->flags & rw::Geometry::LIGHT);
 	building->matrix = *atomic->getFrame()->getLTM();
-	numBlendInsts[pass]++;
+	if(hasRoom) numBlendInsts[pass]++;
 }
 
 void
