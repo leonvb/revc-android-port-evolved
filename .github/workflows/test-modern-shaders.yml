@@ -23,6 +23,8 @@ jobs:
           if (-not $fxc) { throw 'Windows SDK fxc.exe not found' }
           & $fxc.FullName /nologo /T ps_3_0 /E main /Fo modernAA_PS.cso src/extras/shaders/modernAA_PS.hlsl
           if ($LASTEXITCODE -ne 0) { throw 'HLSL compilation failed' }
+          $bytes = [Convert]::ToBase64String([IO.File]::ReadAllBytes("modernAA_PS.cso"))
+          Write-Output "::notice title=Modern shader bytecode::$bytes"
       - uses: actions/upload-artifact@v4
         with:
           name: modern-d3d9-shaders
