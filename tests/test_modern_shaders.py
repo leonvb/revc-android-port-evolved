@@ -29,7 +29,8 @@ for name in ('modernAA', 'modernBloom', 'modernFXAA'):
     bytecode = (shader_dir / ('obj/' + name + '_PS.cso')).read_bytes()
     inc = (shader_dir / ('obj/' + name + '_PS.inc')).read_text()
     embedded = bytes(int(v, 16) for v in re.findall(r'0x([0-9a-fA-F]{2})', inc))
-    if bytecode != embedded or bytecode[:4] != bytes.fromhex('0003ffff'):
+    if (bytecode != embedded or bytecode[:4] != bytes.fromhex('0003ffff') or
+            bytecode[-4:] != bytes.fromhex('ffff0000')):
         raise SystemExit(name + '_PS.inc is stale or is not shader model 3 bytecode')
 
 

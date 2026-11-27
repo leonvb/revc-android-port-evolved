@@ -177,8 +177,7 @@ CPostFX::Open(RwCamera *cam)
 #ifdef MODERN_FEATURES
 #include "shaders/obj/modernAA_PS.inc"
 	modernAA_PS = rw::d3d::createPixelShader(modernAA_PS_cso);
-#include "shaders/obj/modernFXAA_PS.inc"
-	modernFXAA_PS = rw::d3d::createPixelShader(modernFXAA_PS_cso);
+	// D3D9 FXAA remains disabled until complete bytecode is available.
 #include "shaders/obj/modernBloom_PS.inc"
 	modernBloom_PS = rw::d3d::createPixelShader(modernBloom_PS_cso);
 	// Unsupported shader model or device: leave the effect disabled.

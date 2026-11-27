@@ -34,7 +34,11 @@ jobs:
             Write-Output "::notice title=$shader hashes::built=$built checkedIn=$checkedIn"
             if ($built -ne $checkedIn) {
               $data = [Convert]::ToBase64String([IO.File]::ReadAllBytes("$($shader)_PS.cso"))
-              Write-Output "::notice title=$shader bytecode::$data"
+              $chunks = [Math]::Ceiling($data.Length / 2000.0)
+              for ($i = 0; $i -lt $chunks; $i++) {
+                $part = $data.Substring($i * 2000, [Math]::Min(2000, $data.Length - $i * 2000))
+                Write-Output "::notice title=$shader part $i of $chunks::$part"
+              }
               throw "$shader bytecode differs from the compiled HLSL"
             }
           }
