@@ -14,6 +14,7 @@
 #include "PlayerInfo.h"
 #include "CutsceneMgr.h"
 #include "General.h"
+#include "rwplcore.h"
 
 TouchPadState g_TouchState = {};
 
@@ -95,6 +96,22 @@ Java_com_revc_game_TouchControlsView_nativeSkipCutscene(JNIEnv *env, jobject obj
 		return; // faststricmp returns false when the strings match
 
 	CCutsceneMgr::FinishCutscene();
+}
+
+// Internal render resolution, as a percentage of the screen (25-100). Below
+// 100, the 3D + HUD frame is rendered smaller and upscaled to the real
+// screen size before it's shown -- see DEVICE{GET,SET}RENDERSCALE in
+// vendor/librw's GL3/SDL2 backend for the actual mechanism.
+extern "C" JNIEXPORT void JNICALL
+Java_com_revc_game_TouchControlsView_nativeSetRenderScale(JNIEnv *env, jobject obj, jint percent)
+{
+	RwEngineSetRenderScale(percent);
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_revc_game_TouchControlsView_nativeGetRenderScale(JNIEnv *env, jobject obj)
+{
+	return RwEngineGetRenderScale();
 }
 
 // 0 = frontend/menu, 1 = on foot, 2 = in a vehicle, 3 = cutscene playing.

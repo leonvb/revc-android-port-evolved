@@ -69,14 +69,22 @@ namespace CrashHandler {
                 return;
         }
 
-        if (oldHandler && oldHandler->sa_sigaction) {
-            oldHandler->sa_sigaction(signum, info, contextPtr);
-        }
-
         PrintBuildCrashInfo();
         Logger::CrashLog("%s | Fault address: 0x%X", signalName, info->si_addr);
         PRINT_CRASH_STATES(context);
         CStackTrace::printBacktrace();
+
+        if (oldHandler && (oldHandler->sa_flags & SA_SIGINFO) && oldHandler->sa_sigaction) {
+            oldHandler->sa_sigaction(signum, info, contextPtr);
+        }
+
+        // Restore default handler and re-raise so the OS terminates the app
+        // cleanly instead of returning to the faulting instruction forever.
+        struct sigaction dfl {};
+        dfl.sa_handler = SIG_DFL;
+        sigemptyset(&dfl.sa_mask);
+        sigaction(signum, &dfl, nullptr);
+        raise(signum);
     }
 
     void SetupSignalHandlers() {

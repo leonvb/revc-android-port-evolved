@@ -1052,10 +1052,13 @@ void InitialiseLanguage()
  *****************************************************************************
  */
 
+void inputEventHandler();
+
 void HandleExit()
 {
-    // We now handle terminate message always, why handle on some cases?
-    return;
+    inputEventHandler();
+    if (SDL_QuitRequested())
+        RsGlobal.quit = TRUE;
 }
 
 void terminateHandler(int sig, siginfo_t *info, void *ucontext) {
@@ -1275,7 +1278,12 @@ windowIconifyCB(int iconified) {
 void inputEventHandler() {
     SDL_Event event;
 
-    if (SDL_PollEvent(&event)) {
+#if defined ANDROID
+    for (int handled = 0; handled < 256 && SDL_PollEvent(&event); handled++)
+#else
+    if (SDL_PollEvent(&event))
+#endif
+    {
         switch (event.type) {
             case SDL_KEYDOWN:	/* fall-through */
             case SDL_KEYUP:
@@ -1300,7 +1308,15 @@ void inputEventHandler() {
                     // TODO should it be minimized/maximized/restored instead of shown/hidden?
                     case SDL_WINDOWEVENT_SHOWN: windowIconifyCB(false); break;
                     case SDL_WINDOWEVENT_HIDDEN: windowIconifyCB(true); break;
+                    case SDL_WINDOWEVENT_SIZE_CHANGED:
+                    case SDL_WINDOWEVENT_RESIZED:
+                        resizeCB(event.window.data1, event.window.data2);
+                        break;
                 }
+                break;
+
+            case SDL_QUIT:
+                RsGlobal.quit = TRUE;
                 break;
 
             default:
@@ -1886,7 +1902,7 @@ RwV2d rightStickPos;
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_revc_game_TouchControlsView_nativeIsControllerConnected(JNIEnv *env, jobject obj)
 {
-    return gamepad1 != nullptr;
+    return gamepad1 != nullptr && SDL_GameControllerGetAttached(gamepad1);
 }
 
 // Feeds the on-screen touch controls (TouchControls.cpp/TouchControlsView.java)

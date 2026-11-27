@@ -149,11 +149,11 @@ void GetLocalTime_CP(SYSTEMTIME* out);
 #include <unistd.h>
 
 typedef void* HANDLE;
-#define INVALID_HANDLE_VALUE NULL
+#define INVALID_HANDLE_VALUE ((HANDLE)-1)
 #define FindClose(h) \
     do { \
-        if (h != nil) \
-            closedir((DIR*)h); \
+        if ((h) != nil && (h) != INVALID_HANDLE_VALUE) \
+            closedir((DIR*)(h)); \
     } while(0)
 
 #define LOCALE_USER_DEFAULT 0

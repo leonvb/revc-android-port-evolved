@@ -93,7 +93,8 @@ static int
 myfclose(int fd)
 {
 	int ret;
-	assert(fd < NUMFILES);
+	if(fd <= 0 || fd >= NUMFILES)
+		return EOF;
 	if(myfiles[fd].file){
 		ret = fclose(myfiles[fd].file);
 		myfiles[fd].file = nil;
@@ -105,6 +106,8 @@ myfclose(int fd)
 static int
 myfgetc(int fd)
 {
+	if(fd <= 0 || fd >= NUMFILES || myfiles[fd].file == nil)
+		return EOF;
 	int c;
 	c = fgetc(myfiles[fd].file);
 	if(myfiles[fd].isText && c == 015){
@@ -153,6 +156,8 @@ myfgets(char *buf, int len, int fd)
 static size_t
 myfread(void *buf, size_t elt, size_t n, int fd)
 {
+	if(fd <= 0 || fd >= NUMFILES || myfiles[fd].file == nil)
+		return 0;
 	if(myfiles[fd].isText){
 		unsigned char *p;
 		size_t i;
@@ -195,12 +200,16 @@ myfwrite(void *buf, size_t elt, size_t n, int fd)
 static int
 myfseek(int fd, long offset, int whence)
 {
+	if(fd <= 0 || fd >= NUMFILES || myfiles[fd].file == nil)
+		return -1;
 	return fseek(myfiles[fd].file, offset, whence);
 }
 
 static int
 myfeof(int fd)
 {
+	if(fd <= 0 || fd >= NUMFILES || myfiles[fd].file == nil)
+		return 1;
 	return feof(myfiles[fd].file);
 //	return ferror(myfiles[fd].file);
 }

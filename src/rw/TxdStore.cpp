@@ -146,9 +146,18 @@ CTxdStore::LoadTxd(int slot, const char *filename)
 #ifdef GTA_PC
 	_rwD3D8TexDictionaryEnableRasterFormatConversion(true);
 #endif
-	do
+	for(int attempt = 0; attempt < 3; attempt++){
 		stream = RwStreamOpen(rwSTREAMFILENAME, rwSTREAMREAD, filename);
-	while(stream == nil);
+		if(stream != nil)
+			break;
+	}
+	if(stream == nil){
+		debug("CTxdStore::LoadTxd: Failed to open TXD '%s'\n", filename);
+		TxdDef *def = GetSlot(slot);
+		if(def && def->texDict == nil)
+			def->texDict = RwTexDictionaryCreate();
+		return false;
+	}
 	ret = LoadTxd(slot, stream);
 	RwStreamClose(stream, nil);
 	return ret;

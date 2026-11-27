@@ -229,6 +229,10 @@ CStreaming::Init2(void)
 	ms_memoryAvailable = (_dwMemAvailPhys - 10*MB)/2;
 	if(ms_memoryAvailable < 65*MB)
 		ms_memoryAvailable = 65*MB;
+	// A GPU without S3TC (Mali, Xclipse) holds every streamed texture uncompressed
+	// in VRAM (4-8x bigger), so keep the budget smaller to avoid low-memory kills.
+	if(!VideoCardHasNativeS3TC() && ms_memoryAvailable > 512*MB)
+		ms_memoryAvailable = 512*MB;
 	desiredNumVehiclesLoaded = (int32)((ms_memoryAvailable / MB - 65) / 3 + 12);
 	if(desiredNumVehiclesLoaded > MAXVEHICLESLOADED)
 		desiredNumVehiclesLoaded = MAXVEHICLESLOADED;

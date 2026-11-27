@@ -240,20 +240,28 @@ CdStreamInit(int32 numChannels)
         debug("%s\n", pwd);
 	}
 
-	debug("FILES %s\n", StorageRootBuffer);
-	strcpy(imgPath, StorageRootBuffer);
-	strcat(imgPath, "/models/gta3.img");
+    debug("FILES %s\n", StorageRootBuffer);
+    strcpy(imgPath, StorageRootBuffer);
+    strcat(imgPath, "/models/gta3.img");
     debug("%s\n", imgPath);
 
-    if((statvfs(imgPath, &fsInfo)) < 0)
+    char *realImgPath = casepath(imgPath, true);
+    const char *checkPath = realImgPath ? realImgPath : imgPath;
+    if((statvfs(checkPath, &fsInfo)) < 0 && (statvfs(StorageRootBuffer, &fsInfo)) < 0)
 #elifndef ANDROID
     if((statvfs("models/gta3.img", &fsInfo)) < 0)
 #endif
 	{
+#if defined ANDROID
+		if (realImgPath) free(realImgPath);
+#endif
 		CDTRACE("can't get filesystem info");
 		ASSERT(0);
 		return;
 	}
+#if defined ANDROID
+	if (realImgPath) free(realImgPath);
+#endif
 #if defined ANDROID
 	_gdwCdStreamFlags = O_RDONLY;
 #elif defined __linux__

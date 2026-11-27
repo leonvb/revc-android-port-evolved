@@ -292,12 +292,24 @@ WriteVideoCardCapsFile(void)
 }
 #endif
 
+// Whether the GL driver can take DXT textures natively (GL_EXT_texture_compression_s3tc).
+// CanVideoCardDoDXT() below is a hard-coded "no" for OpenGL, so this asks the driver.
+bool
+VideoCardHasNativeS3TC(void)
+{
+#ifdef RW_GL3
+	return rw::gl3::gl3Caps.dxtSupported;
+#else
+	return true;
+#endif
+}
+
 bool
 CanVideoCardDoDXT(void)
 {
 #ifdef LIBRW
 	// TODO
-#ifdef RW_OPENGL
+#if defined(RW_OPENGL) || defined(RW_GL3)
 	return false;
 #else
 	return true;
@@ -430,7 +442,10 @@ CreateTxdImageForVideoCard()
 
 			if (CTxdStore::GetSlot(i)->texDict) {
 
-				int32 pos = STREAMTELL(img);
+				// uint32, not int32: the native-texture cache can pass 2 GB (a GPU without
+				// S3TC stores every texture uncompressed), and a signed position went
+				// negative there, giving later txd.dir entries bogus sector offsets.
+				uint32 pos = STREAMTELL(img);
 
 				if (RwTexDictionaryStreamWrite(CTxdStore::GetSlot(i)->texDict, img) == nil) {
 					DealWithTxdWriteError(i, TXDSTORESIZE, "CVT_ERR");
@@ -440,12 +455,13 @@ CreateTxdImageForVideoCard()
 					CStreaming::RemoveTxd(i);
 #ifdef RW_GL3
 					rw::gl3::needToReadBackTextures = false;
+					rw::gl3::maxTextureSize = 0;
 #endif
 					return false;
 				}
 
-				int32 size = STREAMTELL(img) - pos;
-				int32 num = size % CDSTREAM_SECTOR_SIZE;
+				uint32 size = STREAMTELL(img) - pos;
+				uint32 num = size % CDSTREAM_SECTOR_SIZE;
 
 				size /= CDSTREAM_SECTOR_SIZE;
 				if (num != 0) {
