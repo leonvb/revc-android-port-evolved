@@ -108,6 +108,7 @@
 #ifdef MODERN_FEATURES
 const char *modernPresets[] = { "FEM_CLS", "FEM_MDN", "FEM_CUS" };
 const char *modernFpsOpts[] = { "FEM_F30", "FEM_F60", "FEM_F90", "FEM_120", "FEM_NAT" };
+const char *modernBloomOpts[] = { "FEM_OFF", "FEM_LOW", "FEM_HIG" };
 const char *modernDrivingStyles[] = { "FEM_CLS", "FEM_MDN" };
 const char *modernGpsOpts[] = { "FEM_OFF", "FEM_GPV", "FEM_ALW" };
 const char *modernAimOpts[] = { "FEM_CLS", "FEM_AFR", "FEM_AAS" };
@@ -881,6 +882,9 @@ CMenuScreenCustom aScreens[] = {
 		MENUACTION_CFO_SELECT,	"FEM_DRV", { new CCFOSelect(&CModernConfig::m_nDrivingStyle, "Modern", "DrivingStyle", modernDrivingStyles, ARRAY_SIZE(modernDrivingStyles), false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
 		MENUACTION_CFO_SELECT,	"FEM_MAC", { new CCFOSelect(&CModernConfig::m_bMidAirControl, "Modern", "MidAirControl", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
 		MENUACTION_CFO_SLIDER,	"FEM_LDM", { new CCFOSlider(&CModernConfig::m_fLodDistMultiplier, "Modern", "LodDistMultiplier", 1.0f, 4.0f, ModernLodAfterChange) }, 0, 0, MENUALIGN_LEFT,
+#if defined(EXTENDED_COLOURFILTER) && (defined(RW_OPENGL) || defined(RW_D3D9))
+		MENUACTION_CFO_SELECT,	"FEM_BLM", { new CCFOSelect(&CModernConfig::m_nNeonBloom, "Modern", "NeonBloom", modernBloomOpts, ARRAY_SIZE(modernBloomOpts), false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
+#endif
 		MENUACTION_CFO_SELECT,	"FEM_GPS", { new CCFOSelect(&CModernConfig::m_nGpsRouteMode, "Modern", "GpsRouteMode", modernGpsOpts, ARRAY_SIZE(modernGpsOpts), false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
 		MENUACTION_CFO_SELECT,	"FEM_ASV", { new CCFOSelect(&CModernConfig::m_bAutosave, "Modern", "Autosave", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
 		MENUACTION_CFO_SELECT,	"FEM_VCM", { new CCFOSelect(&CModernConfig::m_bModernVehicleCam, "Modern", "ModernVehicleCam", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,

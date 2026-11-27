@@ -1697,6 +1697,7 @@ Idle(void *arg)
 		TheCamera.RenderMotionBlur();
 		tbEndTimer("RenderMotionBlur");
 #if defined(MODERN_FEATURES) && defined(EXTENDED_COLOURFILTER)
+		CPostFX::RenderModernBloom(Scene.camera);
 		CPostFX::RenderExperimentalEdgeAA(Scene.camera);
 #endif
 
@@ -2013,7 +2014,8 @@ void TheGame(void)
 					TheCamera.SetMotionBlurAlpha(150);
 				TheCamera.RenderMotionBlur();
 #if defined(MODERN_FEATURES) && defined(EXTENDED_COLOURFILTER)
-				CPostFX::RenderExperimentalEdgeAA(Scene.camera);
+				CPostFX::RenderModernBloom(Scene.camera);
+		CPostFX::RenderExperimentalEdgeAA(Scene.camera);
 #endif
 
 				Render2dStuff();

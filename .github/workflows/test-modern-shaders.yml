@@ -31,10 +31,12 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "$shader HLSL compilation failed" }
             $built = (Get-FileHash "$($shader)_PS.cso" -Algorithm SHA256).Hash
             $checkedIn = (Get-FileHash "src/extras/shaders/obj/$($shader)_PS.cso" -Algorithm SHA256).Hash
-            if ($shader -eq 'modernBloom') {
+            Write-Output "::notice title=$shader hashes::built=$built checkedIn=$checkedIn"
+            if ($built -ne $checkedIn) {
               $data = [Convert]::ToBase64String([IO.File]::ReadAllBytes("$($shader)_PS.cso"))
-              Write-Output "::notice title=Bloom SM3 bytecode::$data"
-            } elseif ($built -ne $checkedIn) { throw "$shader bytecode differs from the compiled HLSL" }
+              Write-Output "::notice title=$shader bytecode::$data"
+              throw "$shader bytecode differs from the compiled HLSL"
+            }
           }
       - uses: actions/upload-artifact@v4
         with:

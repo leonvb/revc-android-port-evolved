@@ -38,6 +38,7 @@ public:
 	static void RenderMotionBlur(RwCamera *cam, uint32 blur);
 #ifdef MODERN_FEATURES
 	static void RenderExperimentalEdgeAA(RwCamera *cam);
+	static void RenderModernBloom(RwCamera *cam);
 #endif
 	static void Render(RwCamera *cam, uint32 red, uint32 green, uint32 blue, uint32 blur, int32 type, uint32 bluralpha);
 	static void SmoothColor(uint32 red, uint32 green, uint32 blue, uint32 alpha);
