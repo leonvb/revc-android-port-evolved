@@ -20,6 +20,16 @@ inline bool ShouldPrepareFarClip(bool extended, bool wasExtended, float currentF
 	// Do not replace a clip deliberately set by a scripted or top-down camera.
 	return extended || (wasExtended && currentFar == lastExtendedFar);
 }
+// Keep the previously rendered LOD across a narrow threshold band. This is
+// per-instance (the caller identifies the geometry), not a frame counter.
+inline bool KeepPreviousLod(int previous, int selected, float distance, float boundary)
+{
+	if(previous < 0 || selected < 0 || (previous + 1 != selected && selected + 1 != previous) ||
+	   !(boundary > 0.0f) || !(distance >= 0.0f))
+		return false;
+	const float band = boundary < 100.0f ? 1.0f : 2.0f;
+	return distance >= boundary - band && distance <= boundary + band;
+}
 inline float GenerationMultiplier(float lod)
 {
 	// Keep spawn rings within the fixed-size ped/vehicle pools. Applying the
@@ -48,6 +58,13 @@ inline size_t StreamingBudget(size_t freeBytes)
 	size_t budget = freeBytes / 4;
 	if (budget < 65u * MB) budget = 65u * MB;
 	return budget > 512u * MB ? 512u * MB : budget;
+}
+// Never shrink the established cache when enabling longer draw distances.
+// A lower limit makes the streamer evict models that the larger view still needs.
+inline size_t EffectiveStreamingBudget(size_t classicBudget, size_t freeBytes)
+{
+	const size_t modernBudget = StreamingBudget(freeBytes);
+	return modernBudget > classicBudget ? modernBudget : classicBudget;
 }
 }
 #endif

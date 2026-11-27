@@ -267,7 +267,7 @@ CStreaming::Init2(void)
 	// Use only startup free-memory information already available on desktop and
 	// Android. Retain the existing 65 MB minimum when memory is scarce.
 	extern size_t _dwMemAvailPhys;
-	modernStreamingBudget = ModernVisualPolicy::StreamingBudget(_dwMemAvailPhys);
+	modernStreamingBudget = ModernVisualPolicy::EffectiveStreamingBudget(classicStreamingBudget, _dwMemAvailPhys);
 	ApplyModernStreamingBudget();
 #endif
 

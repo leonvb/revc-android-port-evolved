@@ -25,6 +25,9 @@
 #include "Renderer.h"
 #include "custompipes.h"
 #include "Frontend.h"
+#ifdef MODERN_FEATURES
+#include "ModernVisualPolicy.h"
+#endif
 
 bool gbShowPedRoadGroups;
 bool gbShowCarRoadGroups;
@@ -759,6 +762,25 @@ CRenderer::SetupEntityVisibility(CEntity *ent)
 		mi->m_isDamaged = true;
 
 	RpAtomic *a = mi->GetAtomicFromDistance(dist);
+#ifdef MODERN_FEATURES
+	// Reuse the current instance geometry within a small LOD boundary band.
+	// Damage models and fade-in/fade-out retain their original selection.
+	if(a && ent->m_rwObject && mi->m_alpha == 255 && !mi->m_firstDamaged &&
+	   TheCamera.GetModernLodMultiplier() > 1.0f){
+		RpGeometry *current = RpAtomicGetGeometry((RpAtomic*)ent->m_rwObject);
+		int previous = -1, selected = -1;
+		for(int i = 0; i < mi->m_numAtomics && i < 3; ++i){
+			RpAtomic *candidate = mi->m_atomics[i];
+			if(candidate && RpAtomicGetGeometry(candidate) == current) previous = i;
+			if(candidate == a) selected = i;
+		}
+		if(previous >= 0 && selected >= 0){
+			int lower = Min(previous, selected);
+			if(ModernVisualPolicy::KeepPreviousLod(previous, selected, dist, mi->GetLodDistance(lower)))
+				a = mi->m_atomics[previous];
+		}
+	}
+#endif
 	if(a){
 		mi->m_isDamaged = false;
 		if(ent->m_rwObject == nil)
@@ -1466,14 +1488,12 @@ CRenderer::ScanBigBuildingList(CPtrList &list)
 	CEntity *ent;
 	int vis;
 
-	int f = CTimer::GetFrameCounter() & 3;
 	for(node = list.first; node; node = node->next){
 		ent = (CEntity*)node->item;
-		if(ent->bOffscreen || (ent->m_randomSeed&3) != f){
-			ent->bOffscreen = true;
-			vis = SetupBigBuildingVisibility(ent);
-		}else
-			vis = VIS_VISIBLE;
+		// Re-evaluate every frame: the previous visibility result can become
+		// stale as a related high-detail model is streamed in or out.
+		ent->bOffscreen = true;
+		vis = SetupBigBuildingVisibility(ent);
 		switch(vis){
 		case VIS_VISIBLE:
 			InsertEntityIntoList(ent);

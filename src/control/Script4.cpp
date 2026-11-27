@@ -2008,7 +2008,7 @@ int8 CRunningScript::ProcessCommands900To999(int32 command)
 #endif
 		CStreaming::LoadScene(pos);
 #ifdef FIX_BUGS
-		CTimer::Suspend();
+		CTimer::Resume();
 #else
 		CTimer::Update();
 #endif

@@ -19,7 +19,7 @@ based on one quarter of startup free physical memory, with the existing 65 MiB
 minimum and a 512 MiB cap. Zero/unknown memory falls back to the Classic
 budget. This is a cache limit, not a reservation or a live memory-pressure
 measurement. Switch and 32-bit builds retain the existing budget. The budget
-may be smaller than the previous platform-derived Classic budget. A capable
+is never reduced below the previous platform-derived Classic budget. A capable
 GPU and actual device memory pressure still need assessment.
 
 ## Required before accepting M6.1

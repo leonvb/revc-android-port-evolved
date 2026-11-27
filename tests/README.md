@@ -70,3 +70,20 @@ c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g \
 ```
 
 This tests bounded per-object light selection, not rendered lighting.
+
+## Android CD streamer and scripted scene loads
+
+The host-side test compiles the actual Android streamer using minimal JNI/log
+headers; it does not require game assets or an Android SDK. It runs repeated
+concurrent-channel reads, completion waits, worker restarts and a short-read
+error case. It does not replace an on-device hotel/interior transition test.
+
+```sh
+INCLUDES=$(find src -type d -printf ' -I%p')
+c++ -w -std=c++11 -pthread -ffunction-sections -fdata-sections \
+  -DANDROID -DRW_GL3 -DLIBRW_SDL2 -DLIBRW -Itests/android_stubs \
+  $INCLUDES -Ivendor/librw -Ivendor/sdl2/include tests/android_cdstream.cpp \
+  -Wl,--gc-sections -o /tmp/android_cdstream
+timeout 30 /tmp/android_cdstream
+python3 tests/test_scene_load_contract.py
+```
