@@ -27,6 +27,7 @@ This folder contains the architectural design and phased engineering plan for mo
 
 | Document | Scope | Key Engine Subsystems |
 | :--- | :--- | :--- |
+| [00 — Phased Implementation Plan & Release Schedule](00-implementation-phases.md) | Master 7-phase (`Phase 0–6`) rollout schedule, PR milestone breakdown (`M0.1–M6.5`), dependency graph, risk ratings, and CI/playtest acceptance gates | All subsystems (`dev` → `miami` workflow) |
 | [01 — High-FPS Physics & Driving Modernization](01-physics-and-driving.md) | 60/120 FPS frame-rate-independent physics fixes, progressive tire grip/drifting, weight transfer, transmission upgrades, mid-air vehicle control | `Physical.cpp`, `Automobile.cpp`, `Bike.cpp`, `Boat.cpp`, `Transmission.cpp`, `HandlingMgr.cpp` |
 | [02 — Camera, Aiming & Combat Overhaul](02-camera-aiming-and-combat.md) | Over-the-shoulder 3rd-person ADS camera, move-while-aiming/shooting, hybrid target-assist + free-aim, modern vehicle camera, slow-mo weapon & radio wheels | `Cam.cpp`, `Camera.cpp`, `PlayerPed.cpp`, `Weapon.cpp`, `Hud.cpp`, `Pad.cpp` |
 | [03 — Player Movement & Traversal](03-movement-and-traversal.md) | Surface swimming & water recovery, ledge vaulting/mantling, smooth analog locomotion & sprint model, high-speed vehicle bail-out | `PlayerPed.cpp`, `Ped.cpp`, `WaterLevel.cpp`, `AnimBlendAssociation.cpp` |
@@ -38,29 +39,12 @@ This folder contains the architectural design and phased engineering plan for mo
 
 ## Recommended Implementation Phases
 
-To minimize regression risk and deliver playable value incrementally on `dev`, implement in the following order:
+See **[00 — Phased Implementation Plan & Release Schedule](00-implementation-phases.md)** for the full milestone-by-milestone PR plan (`M0.1` through `M6.5`), dependency graph, risk levels, and acceptance gates:
 
-### Phase 1 — Foundation & High-FPS Physics (Low Risk, Immediate Feel)
-1. Centralize modern feature toggles (`MODERN_PHYSICS`, `MODERN_CAMERA`, `GPS_ROUTE`, etc.) in `src/core/config.h`, `IniFile.cpp`, and a dedicated **"Modernization"** submenu in `MenuScreensCustom.cpp`.
-2. Implement **60/120 FPS time-step fixes** in `CPhysical`, `CAutomobile`, `CBike`, and `CBoat` ([Doc 01](01-physics-and-driving.md)).
-3. Add **progressive driving dynamics & mid-air control** ([Doc 01](01-physics-and-driving.md)).
-
-### Phase 2 — Navigation & Quality of Life (High Utility, Self-Contained)
-1. Implement **A* GPS route pathfinding & radar polyline rendering** using `ThePaths` ([Doc 05](05-navigation-and-qol.md)).
-2. Add **Autosave Slot** after mission completion and property purchases ([Doc 05](05-navigation-and-qol.md)).
-
-### Phase 3 — Camera, Combat & Mobile Controls (Transformative Gameplay)
-1. Implement **Vehicle Camera auto-center delay & speed FOV** ([Doc 02](02-camera-aiming-and-combat.md)).
-2. Implement **Over-the-Shoulder 3rd-person free-aim + strafe-while-shooting** for rifles/heavy weapons and optional pistols/SMGs ([Doc 02](02-camera-aiming-and-combat.md)).
-3. Add **Weapon Wheel & Radio Wheel** with time-dilation ([Doc 02](02-camera-aiming-and-combat.md)).
-4. Pair with **Android Gyro Aiming, Haptics & Context Touch Polish** ([Doc 06](06-android-and-mobile-ux.md)).
-
-### Phase 4 — Traversal Expansion (Medium-High Complexity, Animation-Bound)
-1. Implement **Water Treading / Surface Swimming & Ledge Climb-Out** so falling in water is no longer an instant "Wasted" ([Doc 03](03-movement-and-traversal.md)).
-2. Refine **Ledge Vaulting / Waist-High Wall Mantling** ([Doc 03](03-movement-and-traversal.md)).
-
-### Phase 5 — Modern Graphics & Shader Pipeline (GPU-Focused)
-1. Expand streaming budgets & LOD distances (`Streaming.cpp`, `Renderer.cpp`) ([Doc 04](04-rendering-and-visuals.md)).
-2. Add **HDR Neon Bloom + FXAA** post-processing pass in `CPostFX` ([Doc 04](04-rendering-and-visuals.md)).
-3. Add **Wet-Road Planar/Screen-Space Reflections** and **Dynamic Per-Pixel Point Lights** ([Doc 04](04-rendering-and-visuals.md)).
-4. Implement **Cascaded / Directional Shadow Mapping** ([Doc 04](04-rendering-and-visuals.md)).
+1. **Phase 0 — Foundation**: `config.h` + `reVC.ini` `[Modern]` settings, Pause Menu **"Modernization"** page, `CTimer` exponential time-step helpers, and Android `30 / 60 / 90 / 120 FPS` LTPO display pacing (`M0.1–M0.2`).
+2. **Phase 1 — High-FPS Physics & Driving**: 60/120 FPS physics & boat drag parity fixes, Pacejka-lite progressive tire slip/drifting & weight transfer, and modern transmission + mid-air jump control (`M1.1–M1.3`, [Doc 01](01-physics-and-driving.md)).
+3. **Phase 2 — Navigation & Quality of Life**: Non-intrusive A* GPS route line on minimap/Pause Map and dedicated non-destructive post-mission Autosave slot (`M2.1–M2.2`, [Doc 05](05-navigation-and-qol.md)).
+4. **Phase 3 — Camera, Combat & Radial Wheels**: Modern vehicle camera, Over-the-Shoulder 3rd-person ADS + strafe-while-shooting, hybrid snap + free micro-aim assist, and slow-motion Weapon & Radio Wheels (`M3.1–M3.4`, [Doc 02](02-camera-aiming-and-combat.md)).
+5. **Phase 4 — Android & Mobile UX Polish**: Linear X-axis `VibrationEffect` haptics, orientation-aware gyroscope ADS aiming, sub-context touch HUD transitions, analog throttle/brake slide, and 1-tap HUD shortcuts (`M4.1–M4.3`, [Doc 06](06-android-and-mobile-ux.md)).
+6. **Phase 5 — Traversal Expansion**: Hold-to-sprint & smooth analog locomotion, surface swimming + shore/dock/boat climb-out, and two-ray physical ledge vaulting/mantling (`M5.1–M5.3`, [Doc 03](03-movement-and-traversal.md)).
+7. **Phase 6 — Modern Rendering & Shader Pipeline**: Extended draw distance & streaming budgets, Dual-Kawase HDR neon bloom + FXAA 3.11, per-pixel dynamic point lights, weather-driven wet-road reflections (`CWeather::WetRoads`), and directional sun/moon shadow mapping (`M6.1–M6.5`, [Doc 04](04-rendering-and-visuals.md)).
