@@ -133,9 +133,11 @@ if(${PROJECT}_WITH_OPUS)
 endif()
 if(${PROJECT}_WITH_LIBSNDFILE)
     find_package(SndFile REQUIRED)
-    target_link_libraries(${EXECUTABLE} PRIVATE
-        SndFile::SndFile
-    )
+    if(TARGET SndFile::sndfile)
+        target_link_libraries(${EXECUTABLE} PRIVATE SndFile::sndfile)
+    else()
+        target_link_libraries(${EXECUTABLE} PRIVATE SndFile::SndFile)
+    endif()
     target_compile_definitions(${EXECUTABLE} PRIVATE AUDIO_OAL_USE_SNDFILE)
 endif()
 
@@ -144,11 +146,6 @@ target_compile_definitions(${EXECUTABLE} PRIVATE )
 option(${PROJECT}_WITH_SANITIZERS "Use UB sanitizers (better crash log)" OFF)
 option(${PROJECT}_WITH_ASAN "Use Address sanitizer (better crash log)" OFF)
 option(${PROJECT}_DISABLE_WARNINGS "Disable build warnings" ON)
-
-if(${PROJECT}_DISABLE_WARNINGS)
-    target_compile_options(${EXECUTABLE} PRIVATE
-            -w)
-endif()
 
 if(${PROJECT}_WITH_SANITIZERS)
     target_compile_options(${EXECUTABLE} PUBLIC
@@ -195,11 +192,17 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang
                 -Wpedantic
         )
     endif()
+    if(${PROJECT}_DISABLE_WARNINGS)
+        target_compile_options(${EXECUTABLE} PRIVATE -w)
+    endif()
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     target_compile_options(${EXECUTABLE}
         PUBLIC
             /Zc:sizedDealloc-
     )
+    if(${PROJECT}_DISABLE_WARNINGS)
+        target_compile_options(${EXECUTABLE} PRIVATE /W0)
+    endif()
 endif()
 
 if(NINTENDO_SWITCH)
@@ -208,7 +211,7 @@ else()
     set(${PROJECT}_C_CXX_EXTENSIONS OFF)
 endif()
 
-if(LIBRW_PLATFORM_GL3 AND LIBRW_GL3_GFXLIB STREQUAL "GLFW")
+if(LIBRW_PLATFORM_GL3 AND LIBRW_GL3_GFXLIB STREQUAL "GLFW" AND NOT WIN32 AND NOT APPLE AND NOT NINTENDO_SWITCH)
 	include(CheckSymbolExists)
 
 	set(CMAKE_REQUIRED_LIBRARIES glfw)

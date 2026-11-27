@@ -1,16 +1,13 @@
-from conans import ConanFile, CMake, tools
-from conans.errors import ConanException, ConanInvalidConfiguration
-import os
-import shutil
-import textwrap
+from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
+from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain
 
 
 class ReVCConan(ConanFile):
-    name = "reVC"
+    name = "revc"
     version = "master"
     license = "???"  # FIXME: https://github.com/GTAmodding/re3/issues/794
     settings = "os", "arch", "compiler", "build_type"
-    generators = "cmake", "cmake_find_package"
     options = {
         "audio": ["openal", "miles"],
         "with_libsndfile": [True, False],
@@ -20,56 +17,29 @@ class ReVCConan(ConanFile):
         "audio": "openal",
         "with_libsndfile": False,
         "with_opus": False,
-        # "libsndfile:with_external_libs": False,
-        # "mpg123:flexible_resampling": False,
-        # "mpg123:network": False,
-        # "mpg123:icy": False,
-        # "mpg123:id3v2": False,
-        # "mpg123:ieeefloat": False,
-        # "mpg123:layer1": False,
-        # "mpg123:layer2": False,
-        # "mpg123:layer3": False,
-        # "mpg123:moreinfo": False,
-        # "sdl2:vulkan": False,
-        # "sdl2:opengl": True,
-        # "sdl2:sdl2main": True,
     }
-    no_copy_source = True
-
-    @property
-    def _os_is_playstation2(self):
-        try:
-            return self.settings.os == "Playstation2"
-        except ConanException:
-            return False
+    exports_sources = "CMakeLists.txt", "cmake/*", "src/*", "gamefiles/*"
 
     def configure(self):
         if self.options.audio != "openal":
             self.options.with_libsndfile = False
 
     def requirements(self):
-        self.requires("librw/{}".format(self.version))
-        self.requires("mpg123/1.26.4")
+        self.requires(f"librw/{self.version}")
+        self.requires("mpg123/1.33.0")
         if self.options.audio == "openal":
-            self.requires("openal/1.21.0")
+            self.requires("openal-soft/1.24.3")
         elif self.options.audio == "miles":
-            self.requires("miles-sdk/{}".format(self.version))
+            self.requires(f"miles-sdk/{self.version}")
         if self.options.with_libsndfile:
-            self.requires("libsndfile/1.0.30")
+            self.requires("libsndfile/1.2.2")
         if self.options.with_opus:
             self.requires("opusfile/0.12")
 
-    def export_sources(self):
-        for d in ("cmake", "src"):
-            shutil.copytree(src=d, dst=os.path.join(self.export_sources_folder, d))
-        self.copy("CMakeLists.txt")
-
     def validate(self):
-        if self.options["librw"].platform == "gl3" and self.options["librw"].gl3_gfxlib != "glfw":
+        librw_opts = self.dependencies["librw"].options
+        if librw_opts.platform == "gl3" and librw_opts.get_safe("gl3_gfxlib") != "glfw":
             raise ConanInvalidConfiguration("Only `glfw` is supported as gl3_gfxlib.")
-        #if not self.options.with_opus:
-        #    if not self.options["libsndfile"].with_external_libs:
-        #        raise ConanInvalidConfiguration("reVC with opus support requires a libsndfile built with external libs (=ogg/flac/opus/vorbis)")
 
     @property
     def _reVC_audio(self):
@@ -78,56 +48,21 @@ class ReVCConan(ConanFile):
             "openal": "OAL",
         }[str(self.options.audio)]
 
-    def build(self):
-        if self.source_folder == self.build_folder:
-            raise Exception("cannot build with source_folder == build_folder")
-        try:
-            os.unlink(os.path.join(self.install_folder, "Findlibrw.cmake"))
-            tools.save("FindOpenAL.cmake",
-                       textwrap.dedent(
-                           """
-                           set(OPENAL_FOUND ON)
-                           set(OPENAL_INCLUDE_DIR ${OpenAL_INCLUDE_DIRS})
-                           set(OPENAL_LIBRARY ${OpenAL_LIBRARIES})
-                           set(OPENAL_DEFINITIONS ${OpenAL_DEFINITIONS})
-                           """), append=True)
-            if self.options["librw"].platform == "gl3" and self.options["librw"].gl3_gfxlib == "glfw":
-                tools.save("Findglfw3.cmake",
-                           textwrap.dedent(
-                               """
-                               if(NOT TARGET glfw)
-                                 message(STATUS "Creating glfw TARGET")
-                                 add_library(glfw INTERFACE IMPORTED)
-                                 set_target_properties(glfw PROPERTIES
-                                    INTERFACE_LINK_LIBRARIES CONAN_PKG::glfw)
-                               endif()
-                               """), append=True)
-            tools.save("CMakeLists.txt",
-                       textwrap.dedent(
-                           """
-                           cmake_minimum_required(VERSION 3.0)
-                           project(cmake_wrapper)
-    
-                           include("{}/conanbuildinfo.cmake")
-                           conan_basic_setup(TARGETS NO_OUTPUT_DIRS)
-    
-                           add_subdirectory("{}" reVC)
-                           """).format(self.install_folder.replace("\\", "/"),
-                                       self.source_folder.replace("\\", "/")))
-        except FileNotFoundError:
-            pass
-        cmake = CMake(self)
-        cmake.definitions["REVC_AUDIO"] = self._reVC_audio
-        cmake.definitions["REVC_WITH_OPUS"] = self.options.with_opus
-        cmake.definitions["REVC_INSTALL"] = True
-        cmake.definitions["REVC_VENDORED_LIBRW"] = False
-        env = {}
-        if self._os_is_playstation2:
-            cmake.definitions["CMAKE_TOOLCHAIN_FILE"] = self.deps_user_info["ps2dev-cmaketoolchain"].cmake_toolchain_file
-            env["PS2SDK"] = self.deps_cpp_info["ps2dev-ps2sdk"].rootpath
+    def generate(self):
+        deps = CMakeDeps(self)
+        deps.generate()
+        tc = CMakeToolchain(self)
+        tc.variables["REVC_AUDIO"] = self._reVC_audio
+        tc.variables["REVC_WITH_OPUS"] = bool(self.options.with_opus)
+        tc.variables["REVC_WITH_LIBSNDFILE"] = bool(self.options.with_libsndfile)
+        tc.variables["REVC_INSTALL"] = True
+        tc.variables["REVC_VENDORED_LIBRW"] = False
+        tc.cache_variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
+        tc.generate()
 
-        with tools.environment_append(env):
-            cmake.configure(source_folder=self.build_folder)
+    def build(self):
+        cmake = CMake(self)
+        cmake.configure()
         cmake.build()
 
     def package(self):
