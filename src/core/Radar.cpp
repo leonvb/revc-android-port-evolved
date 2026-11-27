@@ -21,6 +21,9 @@
 #include "SpecialFX.h"
 #include "Font.h"
 #include "SaveBuf.h"
+#ifdef MODERN_FEATURES
+#include "GpsRoute.h"
+#endif
 
 float CRadar::m_radarRange;
 sRadarTrace CRadar::ms_RadarTrace[NUMRADARBLIPS];
@@ -722,6 +725,9 @@ void CRadar::DrawRadarMap()
 	DrawRadarSection(x - 1, y + 1);
 	DrawRadarSection(x, y + 1);
 	DrawRadarSection(x + 1, y + 1);
+#ifdef MODERN_FEATURES
+	CGpsRoute::Draw(false);
+#endif
 }
 
 void CRadar::DrawRadarMask() 
