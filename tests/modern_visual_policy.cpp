@@ -18,6 +18,21 @@ int main()
 	assert(ShouldPrepareFarClip(true, false, 500.0f, 1000.0f));
 	assert(ShouldPrepareFarClip(false, true, 1000.0f, 1000.0f));
 	assert(!ShouldPrepareFarClip(false, true, 200.0f, 1000.0f));
+	assert(KeepPreviousLod(0, 1, 100.5f, 100.0f));
+	assert(KeepPreviousLod(1, 0, 99.5f, 100.0f));
+	assert(!KeepPreviousLod(0, 1, 103.0f, 100.0f));
+	assert(!KeepPreviousLod(0, 2, 100.0f, 100.0f));
+	assert(!KeepPreviousLod(-1, 0, 100.0f, 100.0f));
+	assert(!KeepPreviousLod(0, 1, std::numeric_limits<float>::quiet_NaN(), 100.0f));
+	// Camera jitter within the band must not toggle the selected geometry,
+	// regardless of how many frames occur while the player is standing still.
+	int prior = 0;
+	for(int frame = 0; frame < 10000; ++frame){
+		float distance = frame % 2 ? 100.25f : 99.75f;
+		int selected = distance < 100.0f ? 0 : 1;
+		if(!KeepPreviousLod(prior, selected, distance, 100.0f)) prior = selected;
+		assert(prior == 0);
+	}
 	assert(GenerationMultiplier(1.0f) == 1.0f);
 	assert(GenerationMultiplier(4.0f) == 1.375f);
 	for (unsigned int frame = 0; frame != 16; ++frame) {
@@ -36,4 +51,8 @@ int main()
 	assert(StreamingBudget(512u * MB) == 128u * MB);
 	assert(StreamingBudget(1024u * MB) == 256u * MB);
 	assert(StreamingBudget(size_t(4) * 1024u * MB) == 512u * MB);
+	assert(EffectiveStreamingBudget(240u * MB, 512u * MB) == 240u * MB);
+	assert(EffectiveStreamingBudget(65u * MB, 1024u * MB) == 256u * MB);
+	assert(EffectiveStreamingBudget(512u * MB, 0) == 512u * MB);
+	assert(EffectiveStreamingBudget(768u * MB, size_t(4) * 1024u * MB) == 768u * MB);
 }
