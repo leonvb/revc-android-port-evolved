@@ -45,7 +45,20 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y pkg-config libgl1-mesa-dev xorg-dev libxkbcommon-dev libasound2-dev
+          sudo apt-get install -y \
+            pkg-config \
+            libgl-dev \
+            libasound2-dev \
+            libxkbcommon-dev \
+            libx11-dev libx11-xcb-dev libfontenc-dev libice-dev libsm-dev libxau-dev libxaw7-dev \
+            libxcomposite-dev libxcursor-dev libxdamage-dev libxdmcp-dev libxext-dev libxfixes-dev \
+            libxi-dev libxinerama-dev libxkbfile-dev libxmu-dev libxmuu-dev \
+            libxpm-dev libxrandr-dev libxrender-dev libxres-dev libxss-dev libxt-dev libxtst-dev \
+            libxv-dev libxxf86vm-dev libxcb-glx0-dev libxcb-render0-dev \
+            libxcb-render-util0-dev libxcb-xkb-dev libxcb-icccm4-dev libxcb-image0-dev \
+            libxcb-keysyms1-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-sync-dev libxcb-xfixes0-dev \
+            libxcb-xinerama0-dev libxcb-dri3-dev uuid-dev libxcb-cursor-dev libxcb-dri2-0-dev \
+            libxcb-present-dev libxcb-composite0-dev libxcb-ewmh-dev libxcb-res0-dev libxcb-util-dev
       - name: "Setup conan"
         run: |
           python -m pip install "conan>=2.1"
@@ -64,6 +77,7 @@ jobs:
           if [ "${{ matrix.platform }}" = "gl3" ]; then
             GFXLIB_OPT="-o librw/*:gl3_gfxlib=${{ matrix.gl3_gfxlib || 'glfw' }}"
           fi
+          set -o pipefail
           conan install . \
             --output-folder=build \
             -o "&:audio=${{ matrix.audio }}" \
@@ -72,10 +86,20 @@ jobs:
             --build=missing \
             -c tools.system.package_manager:mode=install \
             -c tools.system.package_manager:sudo=True \
-            -s build_type=RelWithDebInfo
+            -s build_type=RelWithDebInfo 2>&1 | tee install.log || {
+            ERRS=$(grep -iE "ERROR:|fatal error|CMake Error|not found|failed" install.log | tail -n 5 | tr '\n' ' ')
+            echo "::error::conan install failed: ${ERRS}"
+            exit 1
+          }
       - name: "Build reVC (conan build)"
+        shell: bash
         run: |
-          conan build . --output-folder=build -s build_type=RelWithDebInfo
+          set -o pipefail
+          conan build . --output-folder=build -s build_type=RelWithDebInfo 2>&1 | tee build.log || {
+            ERRS=$(grep -iE "fatal error|error C[0-9]+|error LNK[0-9]+|CMake Error|undefined reference|error:" build.log | head -n 5 | tr '\n' ' ')
+            echo "::error::Build failed: ${ERRS}"
+            exit 1
+          }
       - name: "Create binary package (cpack)"
         working-directory: ./build
         run: |
