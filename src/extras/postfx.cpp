@@ -44,6 +44,7 @@ rw::gl3::Shader *contrast;
 #ifdef MODERN_FEATURES
 static int32 u_modernAA;
 static rw::gl3::Shader *modernAA;
+static rw::gl3::Shader *modernFXAA;
 #endif
 #endif
 
@@ -198,6 +199,13 @@ CPostFX::Open(RwCamera *cam)
 	const char *fs[] = { shaderDecl, header_frag_src, modernAA_frag_src, nil };
 	modernAA = Shader::create(vs, fs); // nil means graceful fallback
 	}
+	{
+#include "shaders/obj/im2d_vert.inc"
+#include "shaders/obj/modernFXAA_frag.inc"
+	const char *vs[] = { shaderDecl, header_vert_src, im2d_vert_src, nil };
+	const char *fs[] = { shaderDecl, header_frag_src, modernFXAA_frag_src, nil };
+	modernFXAA = Shader::create(vs, fs);
+	}
 #endif
 
 #endif
@@ -235,6 +243,10 @@ CPostFX::Close(void)
 	if(modernAA){
 		modernAA->destroy();
 		modernAA = nil;
+	}
+	if(modernFXAA){
+		modernFXAA->destroy();
+		modernFXAA = nil;
 	}
 #endif
 	if(colourFilterVC){
@@ -431,13 +443,24 @@ void
 CPostFX::RenderExperimentalEdgeAA(RwCamera *cam)
 {
 #if defined(RW_OPENGL) || defined(RW_D3D9)
-	if (!CModernConfig::m_bMasterEnable || !CModernConfig::m_bExperimentalEdgeAA ||
+	if (!CModernConfig::m_bMasterEnable ||
+	    (!CModernConfig::m_bFxaa && !CModernConfig::m_bExperimentalEdgeAA) ||
 	    !cam || !RwCameraGetRaster(cam) || !pBackBuffer)
 		return;
+#if defined(RW_OPENGL) && defined(LIBRW_SDL2)
+	// The GL raster-copy path still uses unscaled camera dimensions. Avoid
+	// sampling outside the scaled framebuffer until that path is corrected.
+	if (RwEngineGetRenderScale() < 100)
+		return;
+#endif
 #ifdef RW_OPENGL
-	if (!modernAA) return;
+	// Prefer FXAA 3.11; the older preview is an independent opt-in fallback.
+	rw::gl3::Shader *shader = CModernConfig::m_bFxaa ? modernFXAA : nil;
+	if (!shader && CModernConfig::m_bExperimentalEdgeAA) shader = modernAA;
+	if (!shader) return;
 #else
-	if (!modernAA_PS) return;
+	// D3D9 FXAA remains disabled until its SM3 bytecode is available.
+	if (!CModernConfig::m_bExperimentalEdgeAA || !modernAA_PS) return;
 #endif
 	int width = RwRasterGetWidth(RwCameraGetRaster(cam));
 	int height = RwRasterGetHeight(RwCameraGetRaster(cam));
@@ -460,9 +483,9 @@ CPostFX::RenderExperimentalEdgeAA(RwCamera *cam)
 	for (int i = 0; i < 4; i++)
 		RwIm2DVertexSetIntRGBA(&Vertex[i], 255, 255, 255, 255);
 #ifdef RW_OPENGL
-	rw::gl3::im2dOverrideShader = modernAA;
-	modernAA->use();
-	glUniform4fv(modernAA->uniformLocations[u_modernAA], 1, params);
+	rw::gl3::im2dOverrideShader = shader;
+	shader->use();
+	glUniform4fv(shader->uniformLocations[u_modernAA], 1, params);
 #else
 	rw::d3d::d3ddevice->SetPixelShaderConstantF(10, params, 1);
 	rw::d3d::im2dOverridePS = modernAA_PS;

@@ -152,6 +152,7 @@ LookupModernFallbackText(const char *key)
 		{ "FEM_MAC", "MID-AIR CAR CONTROL" },
 		{ "FEM_GPS", "GPS RADAR ROUTE" },
 		{ "FEM_LDM", "EXTENDED DRAW DISTANCE" },
+		{ "FEM_FXA", "FXAA 3.11" },
 		{ "FEM_EAA", "EDGE AA (EXPERIMENTAL)" },
 		{ "FEM_ASV", "POST-MISSION AUTOSAVE" },
 		{ "FEM_FIF", "FAST INTERIOR FADES" },

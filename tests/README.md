@@ -35,3 +35,28 @@ python3 tests/test_modern_shaders.py # requires glslangValidator
 
 The shader test links the librw GL headers and checks generated shader files.
 Neither test exercises live frame capture, GPU rendering, or visual quality.
+
+GL framebuffer color/depth pairing (no GL context required):
+
+```sh
+c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g \
+  tests/gl_framebuffer_mates.cpp -o /tmp/gl_framebuffer_mates
+/tmp/gl_framebuffer_mates
+```
+
+This checks bookkeeping only; actual GL/GLES attachments and framebuffer
+completeness still require a graphics-context/device test.
+
+## Bloom groundwork
+
+```sh
+c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g \
+  tests/modern_bloom_plan.cpp -o /tmp/modern_bloom_plan
+/tmp/modern_bloom_plan
+python3 tests/modern_bloom_reference.py
+python3 tests/test_modern_shaders.py # requires glslangValidator
+```
+
+The reference checks the intended filter math on the CPU; it does not execute
+shader code or render the bloom effect. The shader test validates GLSL linkage;
+Windows CI compiles the HLSL with fxc. Runtime integration is still pending.

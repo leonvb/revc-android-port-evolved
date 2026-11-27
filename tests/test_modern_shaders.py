@@ -8,14 +8,22 @@ import tempfile
 
 root = Path(__file__).resolve().parent.parent
 shader_dir = root / "src/extras/shaders"
-source = (shader_dir / "modernAA.frag").read_text()
-expected = 'const char *modernAA_frag_src =\n'
-for line in source.splitlines():
-    expected += ('"' + line + r'\n"' if line else '') + '\n'
-expected += ';\n'
-actual = (shader_dir / "obj/modernAA_frag.inc").read_text()
-if expected != actual:
-    raise SystemExit('modernAA_frag.inc is stale; run makeinc_glsl.sh modernAA.frag')
+sources = {}
+for name in ("modernAA", "modernBloom"):
+    source = (shader_dir / (name + ".frag")).read_text()
+    sources[name] = source
+    expected = 'const char *' + name + '_frag_src =\n'
+    for line in source.splitlines():
+        expected += ('"' + line + r'\n"' if line else '') + '\n'
+    expected += ';\n'
+    actual = (shader_dir / ("obj/" + name + "_frag.inc")).read_text()
+    if expected != actual:
+        raise SystemExit(name + '_frag.inc is stale; run makeinc_glsl.sh ' + name + '.frag')
+
+subprocess.run(['python3', str(root / 'tests/generate_modern_fxaa.py'), '--check'], check=True)
+fxaa = (shader_dir / 'modernFXAA.frag').read_text().replace(
+    '#include "fxaa311.h"', (shader_dir / 'fxaa311.h').read_text())
+sources['modernFXAA'] = fxaa
 
 bytecode = (shader_dir / "obj/modernAA_PS.cso").read_bytes()
 inc = (shader_dir / "obj/modernAA_PS.inc").read_text()
@@ -41,7 +49,8 @@ variants = {
 with tempfile.TemporaryDirectory() as tmp:
     for name, prefix in variants.items():
         vert = Path(tmp) / (name + '.vert')
-        frag = Path(tmp) / (name + '.frag')
         vert.write_text(prefix + vertex_header + vertex)
-        frag.write_text(prefix + fragment_header + source)
-        subprocess.run(['glslangValidator', '-l', str(vert), str(frag)], check=True)
+        for shader_name, source in sources.items():
+            frag = Path(tmp) / (name + '_' + shader_name + '.frag')
+            frag.write_text(prefix + fragment_header + source)
+            subprocess.run(['glslangValidator', '-l', str(vert), str(frag)], check=True)
