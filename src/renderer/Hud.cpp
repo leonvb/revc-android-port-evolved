@@ -1,4 +1,7 @@
 #include "common.h"
+#ifdef MODERN_FEATURES
+#include "GpsRoute.h"
+#endif
 
 #include "Camera.h"
 #include "DMAudio.h"
@@ -1085,6 +1088,9 @@ void CHud::Draw()
 				Sprites[HUD_RADARDISC].Draw(rect, RADARDISC_COLOR);
 			}
 			CRadar::DrawBlips();
+#ifdef MODERN_FEATURES
+			CGpsRoute::DrawDistance();
+#endif
 		}
 	}
 

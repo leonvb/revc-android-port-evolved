@@ -1,4 +1,7 @@
 #include "common.h"
+#ifdef MODERN_FEATURES
+#include "GpsRoute.h"
+#endif
 #include "platform.h"
 
 #include "Game.h"
@@ -738,6 +741,9 @@ void CGame::ReloadIPLs(void)
 
 void CGame::ShutDownForRestart(void)
 {
+#ifdef MODERN_FEATURES
+	CGpsRoute::Reset();
+#endif
 #ifdef USE_TEXTURE_POOL
 	_TexturePoolsUnknown(false);
 #endif
@@ -947,6 +953,9 @@ void CGame::Process(void)
 		if (!CReplay::IsPlayingBack())
 			CGameLogic::Update();
 		CBridge::Update();
+#ifdef MODERN_FEATURES
+		CGpsRoute::Update();
+#endif
 		CCoronas::DoSunAndMoon();
 		CCoronas::Update();
 		CShadows::UpdateStaticShadows();

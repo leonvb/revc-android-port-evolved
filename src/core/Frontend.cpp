@@ -37,6 +37,7 @@
 #include "sampman.h"
 #ifdef MODERN_FEATURES
 #include "ModernConfig.h"
+#include "GpsRoute.h"
 #endif
 
 // Similar story to Hud.cpp:
@@ -5878,6 +5879,10 @@ CMenuManager::PrintMap(void)
 			m_fMapCenterX + m_fMapSize, m_fMapCenterY + m_fMapSize), CRGBA(255, 255, 255, FadeIn(255)));
 	}
 
+#ifdef MODERN_FEATURES
+	CGpsRoute::Update();
+	CGpsRoute::Draw(true);
+#endif
 	CRadar::DrawBlips();
 	if (m_PrefsShowLegends) {
 		CFont::SetWrapx(MENU_X_RIGHT_ALIGNED(40.0f));
