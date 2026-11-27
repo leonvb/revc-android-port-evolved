@@ -133,9 +133,11 @@ if(${PROJECT}_WITH_OPUS)
 endif()
 if(${PROJECT}_WITH_LIBSNDFILE)
     find_package(SndFile REQUIRED)
-    target_link_libraries(${EXECUTABLE} PRIVATE
-        SndFile::SndFile
-    )
+    if(TARGET SndFile::sndfile)
+        target_link_libraries(${EXECUTABLE} PRIVATE SndFile::sndfile)
+    else()
+        target_link_libraries(${EXECUTABLE} PRIVATE SndFile::SndFile)
+    endif()
     target_compile_definitions(${EXECUTABLE} PRIVATE AUDIO_OAL_USE_SNDFILE)
 endif()
 
