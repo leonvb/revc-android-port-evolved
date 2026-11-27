@@ -153,6 +153,8 @@ LookupModernFallbackText(const char *key)
 		{ "FEM_GPS", "GPS RADAR ROUTE" },
 		{ "FEM_LDM", "EXTENDED DRAW DISTANCE" },
 		{ "FEM_BLM", "NEON BLOOM" },
+		{ "FEM_DPL", "DYNAMIC POINT LIGHTS" },
+		{ "FEM_WET", "WET ROAD REFLECTIONS" },
 		{ "FEM_FXA", "FXAA 3.11" },
 		{ "FEM_EAA", "EDGE AA (EXPERIMENTAL)" },
 		{ "FEM_ASV", "POST-MISSION AUTOSAVE" },

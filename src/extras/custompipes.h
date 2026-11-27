@@ -77,6 +77,7 @@ void CustomPipeShutdown(void);
 void SetTxdFindCallback(void);
 
 extern bool bRenderingEnvMap;
+extern bool EnvMapHasFrame;
 extern int32 EnvMapSize;
 extern rw::Camera *EnvMapCam;
 extern rw::Texture *EnvMapTex;

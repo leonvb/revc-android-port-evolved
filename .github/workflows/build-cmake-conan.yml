@@ -46,6 +46,8 @@ jobs:
           c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g tests/modern_bloom_plan.cpp -o /tmp/modern_bloom_plan
           /tmp/modern_bloom_plan
           python3 tests/modern_bloom_reference.py
+          c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g tests/modern_lighting_policy.cpp -o /tmp/modern_lighting_policy
+          /tmp/modern_lighting_policy
       - name: "Checkout Miles SDK Import Library project"
         uses: actions/checkout@v4
         if: ${{ matrix.audio == 'miles' }}

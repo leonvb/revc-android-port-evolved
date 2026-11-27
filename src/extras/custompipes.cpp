@@ -47,6 +47,7 @@ CustomMatCopy(void *dst, void *src, int32, int32)
 rw::TexDictionary *neoTxd;
 
 bool bRenderingEnvMap;
+bool EnvMapHasFrame;
 int32 EnvMapSize = 128;
 rw::Camera *EnvMapCam;
 rw::Texture *EnvMapTex;
@@ -154,7 +155,7 @@ EnvMapRender(void)
 		rw::SetRenderState(rw::DESTBLEND, rw::BLENDINVSRCALPHA);
 	}
 	RwCameraEndUpdate(EnvMapCam);
-
+	EnvMapHasFrame = true;
 
 	RwCameraBeginUpdate(Scene.camera);
 
@@ -166,6 +167,7 @@ EnvMapRender(void)
 static void
 EnvMapInit(void)
 {
+	EnvMapHasFrame = false;
 	if(neoTxd)
 		EnvMaskTex = neoTxd->find("CarReflectionMask");
 
@@ -216,6 +218,7 @@ EnvMapInit(void)
 static void
 EnvMapShutdown(void)
 {
+	EnvMapHasFrame = false;
 	EnvMapTex->raster = nil;
 	EnvMapTex->destroy();
 	EnvMapTex = nil;

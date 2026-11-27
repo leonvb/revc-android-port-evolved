@@ -12,6 +12,10 @@
 #include "Renderer.h"
 #include "World.h"
 #include "custompipes.h"
+#ifdef MODERN_FEATURES
+#include "ModernConfig.h"
+#include "ModernLighting.h"
+#endif
 
 #ifdef EXTENDED_PIPELINES
 
@@ -32,6 +36,11 @@ static int32 u_eye;
 static int32 u_reflProps;
 static int32 u_specDir;
 static int32 u_specColor;
+#ifdef MODERN_FEATURES
+static int32 u_modernPosition, u_modernColor, u_modernDirection, u_modernOptions, u_modernSky;
+static rw::gl3::Shader *modernWorldShader;
+static bool modernRenderingRoad;
+#endif
 
 #define U(i) currentShader->uniformLocations[i]
 
@@ -193,7 +202,15 @@ worldRenderCB(rw::Atomic *atomic, rw::gl3::InstanceDataHeader *header)
 	using namespace rw;
 	using namespace rw::gl3;
 
-	if(!LightmapEnable){
+#ifdef MODERN_FEATURES
+	bool useModern = modernWorldShader && CModernConfig::m_bMasterEnable &&
+	                 (atomic->geometry->flags & Geometry::NORMALS) && !bRenderingEnvMap &&
+	                 (CModernConfig::m_bDynamicPointLights ||
+	                  (modernRenderingRoad && CModernConfig::m_bWetRoadReflections && CWeather::WetRoads > 0.0f));
+#else
+	const bool useModern = false;
+#endif
+	if(!LightmapEnable && !useModern){
 		gl3::defaultRenderCB(atomic, header);
 		return;
 	}
@@ -208,14 +225,36 @@ worldRenderCB(rw::Atomic *atomic, rw::gl3::InstanceDataHeader *header)
 	InstanceData *inst = header->inst;
 	rw::int32 n = header->numMeshes;
 
-	neoWorldShader->use();
+#ifdef MODERN_FEATURES
+	if(useModern){
+		modernWorldShader->use();
+		ModernLightUniforms lights;
+		BuildModernLights(atomic, CModernConfig::m_bDynamicPointLights != 0, lights);
+		glUniform4fv(U(u_modernPosition), ModernLightingPolicy::MaxLights, &lights.position[0][0]);
+		glUniform4fv(U(u_modernColor), ModernLightingPolicy::MaxLights, &lights.color[0][0]);
+		glUniform4fv(U(u_modernDirection), ModernLightingPolicy::MaxLights, &lights.direction[0][0]);
+		V3d eye = rw::engine->currentCamera->getFrame()->getLTM()->pos;
+		glUniform3fv(U(u_eye), 1, (float*)&eye);
+		bool envAvailable = EnvMapTex && EnvMapHasFrame && VehiclePipeSwitch == VEHICLEPIPE_NEO;
+		float options[4] = { modernRenderingRoad && CModernConfig::m_bWetRoadReflections ?
+		                     Min(Max(CWeather::WetRoads, 0.0f), 1.0f) : 0.0f,
+		                     envAvailable ? 1.0f : 0.0f, 0.0f, 0.0f };
+		float sky[4] = { CTimeCycle::GetSkyBottomRed()/255.0f,
+		                 CTimeCycle::GetSkyBottomGreen()/255.0f,
+		                 CTimeCycle::GetSkyBottomBlue()/255.0f, 0.0f };
+		glUniform4fv(U(u_modernOptions), 1, options);
+		glUniform4fv(U(u_modernSky), 1, sky);
+		setTexture(2, envAvailable ? EnvMapTex : nil);
+	}else
+#endif
+		neoWorldShader->use();
 
 	float lightfactor[4];
 
 	while(n--){
 		m = inst->material;
 
-		if(MatFX::getEffects(m) == MatFX::DUAL){
+		if(LightmapEnable && MatFX::getEffects(m) == MatFX::DUAL){
 			MatFX *matfx = MatFX::get(m);
 			Texture *dualtex = matfx->getDualTexture();
 			if(dualtex == nil)
@@ -227,11 +266,14 @@ worldRenderCB(rw::Atomic *atomic, rw::gl3::InstanceDataHeader *header)
 			setTexture(1, nil);
 			lightfactor[0] = lightfactor[1] = lightfactor[2] = 0.0f;
 		}
-		lightfactor[3] = m->color.alpha/255.0f;
+		lightfactor[3] = useModern && !LightmapEnable ? 1.0f : m->color.alpha/255.0f;
 		glUniform4fv(U(u_lightMap), 1, lightfactor);
 
 		RGBA color = { 255, 255, 255, m->color.alpha };
-		setMaterial(color, m->surfaceProps);
+		if(useModern && !LightmapEnable)
+			setMaterial(atomic->geometry->flags, m->color, m->surfaceProps);
+		else
+			setMaterial(color, m->surfaceProps);
 
 		setTexture(0, m->texture);
 
@@ -241,6 +283,9 @@ worldRenderCB(rw::Atomic *atomic, rw::gl3::InstanceDataHeader *header)
 		inst++;
 	}
 	setTexture(1, nil);
+#ifdef MODERN_FEATURES
+	if(useModern) setTexture(2, nil);
+#endif
 	teardownVertexInput(header);
 }
 
@@ -263,7 +308,15 @@ CreateWorldPipe(void)
 	neoWorldShader = Shader::create(vs, fs);
 	assert(neoWorldShader);
 	}
-
+#ifdef MODERN_FEATURES
+	{
+#include "shaders/obj/modernWorld_vert.inc"
+#include "shaders/obj/modernWorld_frag.inc"
+	const char *vs[] = { shaderDecl, "#define DIRECTIONALS\n#define POINTLIGHTS\n#define SPOTLIGHTS\n", header_vert_src, modernWorld_vert_src, nil };
+	const char *fs[] = { shaderDecl, header_frag_src, modernWorld_frag_src, nil };
+	modernWorldShader = Shader::create(vs, fs); // nil = classic world fallback
+	}
+#endif
 
 	rw::gl3::ObjPipeline *pipe = rw::gl3::ObjPipeline::create();
 	pipe->instanceCB = rw::gl3::defaultInstanceCB;
@@ -275,6 +328,9 @@ CreateWorldPipe(void)
 void
 DestroyWorldPipe(void)
 {
+#ifdef MODERN_FEATURES
+	if(modernWorldShader){ modernWorldShader->destroy(); modernWorldShader = nil; }
+#endif
 	neoWorldShader->destroy();
 	neoWorldShader = nil;
 
@@ -297,7 +353,13 @@ glossRenderCB(rw::Atomic *atomic, rw::gl3::InstanceDataHeader *header)
 	using namespace rw;
 	using namespace rw::gl3;
 
+#ifdef MODERN_FEATURES
+	modernRenderingRoad = true;
+#endif
 	worldRenderCB(atomic, header);
+#ifdef MODERN_FEATURES
+	modernRenderingRoad = false;
+#endif
 	if(!GlossEnable)
 		return;
 
@@ -577,6 +639,13 @@ CustomPipeRegisterGL(void)
 	u_reflProps = rw::gl3::registerUniform("u_reflProps");
 	u_specDir = rw::gl3::registerUniform("u_specDir");
 	u_specColor = rw::gl3::registerUniform("u_specColor");
+#ifdef MODERN_FEATURES
+	u_modernPosition = rw::gl3::registerUniform("u_modernPosition");
+	u_modernColor = rw::gl3::registerUniform("u_modernColor");
+	u_modernDirection = rw::gl3::registerUniform("u_modernDirection");
+	u_modernOptions = rw::gl3::registerUniform("u_modernOptions");
+	u_modernSky = rw::gl3::registerUniform("u_modernSky");
+#endif
 }
 
 

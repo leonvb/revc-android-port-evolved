@@ -20,6 +20,15 @@ for name in ("modernAA", "modernBloom"):
     if expected != actual:
         raise SystemExit(name + '_frag.inc is stale; run makeinc_glsl.sh ' + name + '.frag')
 
+for ext in ('vert', 'frag'):
+    source = (shader_dir / ('modernWorld.' + ext)).read_text()
+    expected = 'const char *modernWorld_' + ext + '_src =\n'
+    for line in source.splitlines():
+        expected += ('"' + line + r'\n"' if line else '') + '\n'
+    expected += ';\n'
+    if (shader_dir / ('obj/modernWorld_' + ext + '.inc')).read_text() != expected:
+        raise SystemExit('modernWorld_' + ext + '.inc is stale')
+
 subprocess.run(['python3', str(root / 'tests/generate_modern_fxaa.py'), '--check'], check=True)
 fxaa = (shader_dir / 'modernFXAA.frag').read_text().replace(
     '#include "fxaa311.h"', (shader_dir / 'fxaa311.h').read_text())
@@ -56,3 +65,9 @@ with tempfile.TemporaryDirectory() as tmp:
             frag = Path(tmp) / (name + '_' + shader_name + '.frag')
             frag.write_text(prefix + fragment_header + source)
             subprocess.run(['glslangValidator', '-l', str(vert), str(frag)], check=True)
+        world_vert = Path(tmp) / (name + '_world.vert')
+        world_frag = Path(tmp) / (name + '_world.frag')
+        world_vert.write_text(prefix + '#define DIRECTIONALS\n#define POINTLIGHTS\n#define SPOTLIGHTS\n' +
+                              vertex_header + (shader_dir / 'modernWorld.vert').read_text())
+        world_frag.write_text(prefix + fragment_header + (shader_dir / 'modernWorld.frag').read_text())
+        subprocess.run(['glslangValidator', '-l', str(world_vert), str(world_frag)], check=True)

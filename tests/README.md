@@ -60,3 +60,13 @@ python3 tests/test_modern_shaders.py # requires glslangValidator
 The reference checks the intended filter math on the CPU; it does not execute
 shader code or render the bloom effect. The shader test validates GLSL linkage;
 Windows CI compiles the HLSL with fxc. Runtime integration is still pending.
+
+## Modern light selection
+
+```sh
+c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g \
+  tests/modern_lighting_policy.cpp -o /tmp/modern_lighting_policy
+/tmp/modern_lighting_policy
+```
+
+This tests bounded per-object light selection, not rendered lighting.
