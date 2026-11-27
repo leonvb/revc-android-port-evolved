@@ -4,41 +4,28 @@ on:
   push:
   release:
     types: published
+  workflow_dispatch:
 jobs:
   build-cmake:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: 'windows-latest'
             platform: 'gl3'
             gl3_gfxlib: 'glfw'
             audio: 'openal'
-#          - os: 'windows-latest'
-#            platform: 'gl3'
-#            gl3_gfxlib: 'sdl2'
-#            audio: 'openal'
           - os: 'windows-latest'
             platform: 'd3d9'
             audio: 'openal'
-#          - os: 'windows-latest'
-#            platform: 'd3d9'
-#            audio: 'miles'
-          - os: 'ubuntu-18.04'
+          - os: 'ubuntu-latest'
             platform: 'gl3'
             gl3_gfxlib: 'glfw'
             audio: 'openal'
-#          - os: 'ubuntu-18.04'
-#            platform: 'gl3'
-#            gl3_gfxlib: 'sdl2'
-#            audio: 'openal'
           - os: 'macos-latest'
             platform: 'gl3'
             gl3_gfxlib: 'glfw'
             audio: 'openal'
-#          - os: 'macos-latest'
-#            platform: 'gl3'
-#            gl3_gfxlib: 'sdl2'
-#            audio: 'openal'
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.platform == 'ps2' || matrix.gl3_gfxlib == 'sdl2' || matrix.audio == 'miles' }}
     steps:
@@ -51,60 +38,77 @@ jobs:
         with:
           repository: 'withmorten/re3mss'
           path: 're3mss'
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.x'
-      - name: "Use XCode 11 as default (conan-center-index does not provide XCode 12 binaries at the moment)"
-        if: startsWith(matrix.os, 'macos')
+      - name: "Install Linux system dependencies"
+        if: runner.os == 'Linux'
         run: |
-          sudo xcode-select --switch /Applications/Xcode_11.7.app
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            pkg-config \
+            libgl-dev \
+            libasound2-dev \
+            libxkbcommon-dev \
+            libx11-dev libx11-xcb-dev libfontenc-dev libice-dev libsm-dev libxau-dev libxaw7-dev \
+            libxcomposite-dev libxcursor-dev libxdamage-dev libxdmcp-dev libxext-dev libxfixes-dev \
+            libxi-dev libxinerama-dev libxkbfile-dev libxmu-dev libxmuu-dev \
+            libxpm-dev libxrandr-dev libxrender-dev libxres-dev libxss-dev libxt-dev libxtst-dev \
+            libxv-dev libxxf86vm-dev libxcb-glx0-dev libxcb-render0-dev \
+            libxcb-render-util0-dev libxcb-xkb-dev libxcb-icccm4-dev libxcb-image0-dev \
+            libxcb-keysyms1-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-sync-dev libxcb-xfixes0-dev \
+            libxcb-xinerama0-dev libxcb-dri3-dev uuid-dev libxcb-cursor-dev libxcb-dri2-0-dev \
+            libxcb-present-dev libxcb-composite0-dev libxcb-ewmh-dev libxcb-res0-dev libxcb-util-dev
       - name: "Setup conan"
         run: |
-          python -m pip install conan
-          conan config init
-          conan config set log.print_run_commands=True
-          conan config set general.revisions_enabled=1
-          conan remote add bincrafters https://bincrafters.jfrog.io/artifactory/api/conan/public-conan
-#          conan remote add madebr_ps2dev https://api.bintray.com/conan/madebr/ps2dev
-      - name: "Add os=playstation2 + gcc.version=3.2 to .conan/settings.yml"
-        shell: python
-        run: |
-          import os, yaml
-          settings_path = os.path.expanduser("~/.conan/settings.yml")
-          yml = yaml.safe_load(open(settings_path))
-          yml["os"]["playstation2"] = None
-          yml["compiler"]["gcc"]["version"].append("3.2")
-          yml["compiler"]["gcc"]["version"].sort()
-          yaml.safe_dump(yml, open(settings_path, "w"))
-      - name: "Create host profile"
-        shell: bash
-        run: |
-          if test "${{ matrix.platform }}" = "ps2"; then
-            cp vendor/librw/conan/playstation2 host_profile
-          else
-            cp ~/.conan/profiles/default host_profile
-          fi
-      - name: "Export Playstation 2 CMake toolchain conan recipe"
-        run: |
-          conan export vendor/librw/cmake/ps2/cmaketoolchain ps2dev-cmaketoolchain/master@
+          python -m pip install "conan>=2.1"
+          conan profile detect --force
       - name: "Export librw conan recipe"
         run: |
-          conan export vendor/librw librw/master@
+          conan export vendor/librw
       - name: "Export Miles SDK conan recipe"
         if: ${{ matrix.audio == 'miles' }}
         run: |
-          conan export re3mss miles-sdk/master@
+          conan export re3mss --name=miles-sdk --version=master
       - name: "Download/build dependencies (conan install)"
+        shell: bash
         run: |
-          conan install ${{ github.workspace }} reVC/master@ -if build -o reVC:audio=${{ matrix.audio }} -o librw:platform=${{ matrix.platform }} -o librw:gl3_gfxlib=${{ matrix.gl3_gfxlib || 'glfw' }} --build missing -pr:h ./host_profile -pr:b default -s reVC:build_type=RelWithDebInfo -s librw:build_type=RelWithDebInfo
-        env:
-          CONAN_SYSREQUIRES_MODE: enabled
+          GFXLIB_OPT=""
+          if [ "${{ matrix.platform }}" = "gl3" ]; then
+            GFXLIB_OPT="-o librw/*:gl3_gfxlib=${{ matrix.gl3_gfxlib || 'glfw' }}"
+          fi
+          set -o pipefail
+          conan install . \
+            --output-folder=build \
+            -o "&:audio=${{ matrix.audio }}" \
+            -o "librw/*:platform=${{ matrix.platform }}" \
+            ${GFXLIB_OPT} \
+            --build=missing \
+            -c tools.system.package_manager:mode=install \
+            -c tools.system.package_manager:sudo=True \
+            -s build_type=RelWithDebInfo 2>&1 | tee install.log || {
+            ERRS=$(grep -iE "ERROR:|fatal error|CMake Error|not found|failed" install.log | tail -n 5 | tr '\n' ' ')
+            echo "::error::conan install failed: ${ERRS}"
+            exit 1
+          }
       - name: "Build reVC (conan build)"
+        shell: bash
         run: |
-          conan build ${{ github.workspace }} -if build -bf build -pf package
-      - name: "Package reVC (conan package)"
-        run: |
-          conan package ${{ github.workspace }} -if build -bf build -pf package
+          GFXLIB_OPT=""
+          if [ "${{ matrix.platform }}" = "gl3" ]; then
+            GFXLIB_OPT="-o librw/*:gl3_gfxlib=${{ matrix.gl3_gfxlib || 'glfw' }}"
+          fi
+          set -o pipefail
+          conan build . \
+            --output-folder=build \
+            -o "&:audio=${{ matrix.audio }}" \
+            -o "librw/*:platform=${{ matrix.platform }}" \
+            ${GFXLIB_OPT} \
+            -s build_type=RelWithDebInfo 2>&1 | tee build.log || {
+            ERRS=$(grep -iE "fatal error|error C[0-9]+|error LNK[0-9]+|CMake Error|undefined reference|error:" build.log | head -n 5 | tr '\n' ' ')
+            echo "::error::Build failed: ${ERRS}"
+            exit 1
+          }
       - name: "Create binary package (cpack)"
         working-directory: ./build
         run: |

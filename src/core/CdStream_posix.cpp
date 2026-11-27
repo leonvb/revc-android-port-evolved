@@ -1,6 +1,6 @@
 #ifndef _WIN32
 #include "common.h"
-#ifdef GTA_PC || GTA_MOBILE
+#if defined(GTA_PC) || defined(GTA_MOBILE)
 #include "crossplatform.h"
 #include <signal.h>
 #include <pthread.h>
@@ -60,7 +60,7 @@ re3_sem_close(sem_t* sem)
 	free(sem);
 }
 
-#elifndef ANDROID
+#elif !defined(ANDROID)
 
 #define RE3_SEM_OPEN re3_sem_open
 sem_t*
@@ -248,7 +248,7 @@ CdStreamInit(int32 numChannels)
     char *realImgPath = casepath(imgPath, true);
     const char *checkPath = realImgPath ? realImgPath : imgPath;
     if((statvfs(checkPath, &fsInfo)) < 0 && (statvfs(StorageRootBuffer, &fsInfo)) < 0)
-#elifndef ANDROID
+#elif !defined(ANDROID)
     if((statvfs("models/gta3.img", &fsInfo)) < 0)
 #endif
 	{
