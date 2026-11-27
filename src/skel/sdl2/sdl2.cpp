@@ -31,6 +31,9 @@ long _dwOperatingSystemVersion;
 #include "AnimViewer.h"
 #include "Font.h"
 #include "MemoryMgr.h"
+#ifdef MODERN_FEATURES
+#include "ModernConfig.h"
+#endif
 
 #if defined ANDROID
 #include <jni.h>
@@ -136,10 +139,12 @@ psCameraBeginUpdate(RwCamera *camera)
 void
 psCameraShowRaster(RwCamera *camera)
 {
-#ifdef LEGACY_MENU_OPTIONS
+#ifdef MODERN_FEATURES
+    if (CModernConfig::ShouldWaitVSyncInGameplay() || FrontEndMenuManager.m_bMenuActive)
+#elif defined LEGACY_MENU_OPTIONS
     if (FrontEndMenuManager.m_PrefsVsync || FrontEndMenuManager.m_bMenuActive)
 #else
-        if (FrontEndMenuManager.m_PrefsFrameLimiter || FrontEndMenuManager.m_bMenuActive)
+    if (FrontEndMenuManager.m_PrefsFrameLimiter || FrontEndMenuManager.m_bMenuActive)
 #endif
         RwCameraShowRaster(camera, PSGLOBAL(window), rwRASTERFLIPWAITVSYNC);
     else
@@ -1757,7 +1762,11 @@ main(int argc, char *argv[])
                         float ms = (float)CTimer::GetCurrentTimeInCycles() / (float)CTimer::GetCyclesPerMillisecond();
                         if ( RwInitialised )
                         {
+#ifdef MODERN_FEATURES
+                            if (!CModernConfig::ShouldFrameLimitGameplay() || (1000.0f / (float)RsGlobal.maxFPS) < ms)
+#else
                             if (!FrontEndMenuManager.m_PrefsFrameLimiter || (1000.0f / (float)RsGlobal.maxFPS) < ms)
+#endif
                                 RsEventHandler(rsIDLE, (void *)TRUE);
                         }
                         break;

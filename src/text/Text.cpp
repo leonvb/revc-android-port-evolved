@@ -130,6 +130,76 @@ CText::Unload(void)
 	memset(szMissionTableName, 0, sizeof(szMissionTableName));
 }
 
+#ifdef MODERN_FEATURES
+static wchar *
+LookupModernFallbackText(const char *key)
+{
+	if (!key || key[0] == '\0')
+		return nil;
+
+	struct FallbackEntry {
+		const char *key;
+		const char *text;
+	};
+	static const FallbackEntry fallbacks[] = {
+		{ "FEO_MOD", "Modernization" },
+		{ "FET_MOD", "MODERNIZATION" },
+		{ "FEM_MPR", "MODERN PRESET" },
+		{ "FEM_MMA", "MODERN FEATURES" },
+		{ "FEM_TFP", "TARGET FPS" },
+		{ "FEM_HFP", "HIGH FPS PHYSICS FIX" },
+		{ "FEM_DRV", "DRIVING DYNAMICS" },
+		{ "FEM_MAC", "MID-AIR CAR CONTROL" },
+		{ "FEM_GPS", "GPS RADAR ROUTE" },
+		{ "FEM_ASV", "POST-MISSION AUTOSAVE" },
+		{ "FEM_FIF", "FAST INTERIOR FADES" },
+		{ "FEM_VCM", "MODERN VEHICLE CAMERA" },
+		{ "FEM_AIM", "AIMING MODE" },
+		{ "FEM_WRW", "WEAPON & RADIO WHEELS" },
+		{ "FEM_HAP", "HAPTICS INTENSITY" },
+		{ "FEM_GYR", "GYROSCOPE AIMING" },
+		{ "FEM_HSP", "HOLD TO SPRINT" },
+		{ "FEM_SWM", "PLAYER SWIMMING" },
+		{ "FEM_MNT", "LEDGE MANTLING" },
+		{ "FEM_CLS", "CLASSIC" },
+		{ "FEM_MDN", "MODERN" },
+		{ "FEM_CUS", "CUSTOM" },
+		{ "FEM_F30", "30 FPS" },
+		{ "FEM_F60", "60 FPS" },
+		{ "FEM_F90", "90 FPS" },
+		{ "FEM_120", "120 FPS" },
+		{ "FEM_NAT", "NATIVE" },
+		{ "FEM_GPV", "IN VEHICLES" },
+		{ "FEM_ALW", "ALWAYS" },
+		{ "FEM_AFR", "MODERN FREE-AIM" },
+		{ "FEM_AAS", "MODERN ASSISTED" },
+		{ "FEM_SUB", "SUBTLE" },
+		{ "FEM_FUL", "FULL" },
+		{ "FEM_GAD", "WHILE AIMING" },
+	};
+
+	// Use an 8-slot ring buffer so multiple CText::Get() calls in the same expression
+	// or draw pass (e.g. leftText + rightText + header) never clobber one another.
+	static wchar ringBuf[8][40];
+	static uint32 ringIdx = 0;
+
+	for (size_t i = 0; i < sizeof(fallbacks) / sizeof(fallbacks[0]); i++) {
+		if (strcmp(key, fallbacks[i].key) == 0) {
+			wchar *dst = ringBuf[ringIdx++ & 7];
+			const char *src = fallbacks[i].text;
+			size_t j = 0;
+			while (src[j] != '\0' && j < 39) {
+				dst[j] = (unsigned char)src[j];
+				j++;
+			}
+			dst[j] = '\0';
+			return dst;
+		}
+	}
+	return nil;
+}
+#endif
+
 wchar*
 CText::Get(const char *key)
 {
@@ -145,6 +215,14 @@ CText::Get(const char *key)
 		outstr = mission_keyArray.Search(key, mission_data.chars, &result);
 #else
 		outstr = mission_keyArray.Search(key, &result);
+#endif
+
+#ifdef MODERN_FEATURES
+	if (!result) {
+		wchar *fallback = LookupModernFallbackText(key);
+		if (fallback)
+			return fallback;
+	}
 #endif
 	return outstr;
 }

@@ -7,9 +7,14 @@
 
 #if defined ANDROID
 
+#include <SDL_system.h>
+
 extern "C" JavaVM *javaVM;
 
 JNIEnv* CJavaWrapper::GetEnv() {
+    if (!javaVM) {
+        return (JNIEnv*)SDL_AndroidGetJNIEnv();
+    }
 
     JNIEnv* env = NULL;
 
@@ -66,6 +71,47 @@ CJavaWrapper::~CJavaWrapper() {
     JNIEnv* pEnv = GetEnv();
     if (pEnv) {
         pEnv->DeleteGlobalRef(this->activity);
+    }
+}
+
+void CJavaWrapper::SetTargetRefreshRate(int fps) {
+    JNIEnv* env = (JNIEnv*)SDL_AndroidGetJNIEnv();
+    if (!env) {
+        env = GetEnv();
+    }
+    if (!env) {
+        return;
+    }
+
+    jobject act = (jobject)SDL_AndroidGetActivity();
+    bool releaseLocalAct = true;
+    if (!act && g_pJavaWrapper) {
+        act = g_pJavaWrapper->activity;
+        releaseLocalAct = false;
+    }
+    if (!act) {
+        return;
+    }
+
+    jclass actClass = env->GetObjectClass(act);
+    if (actClass) {
+        jmethodID mid = env->GetMethodID(actClass, "setTargetRefreshRate", "(I)V");
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            mid = nullptr;
+        }
+        if (mid) {
+            env->CallVoidMethod(act, mid, (jint)fps);
+            if (env->ExceptionCheck()) {
+                env->ExceptionDescribe();
+                env->ExceptionClear();
+            }
+        }
+        env->DeleteLocalRef(actClass);
+    }
+
+    if (releaseLocalAct) {
+        env->DeleteLocalRef(act);
     }
 }
 

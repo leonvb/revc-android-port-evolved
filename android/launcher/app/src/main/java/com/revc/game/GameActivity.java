@@ -12,6 +12,8 @@ import android.os.Environment;
 import android.provider.Settings;
 import android.widget.Toast;
 
+import android.view.Display;
+import android.view.Surface;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 
@@ -50,6 +52,7 @@ public class GameActivity extends SDLActivity {
 
     private static final int REQUEST_LEGACY_STORAGE_PERMISSION = 1001;
     private boolean missingGameFiles = false;
+    private volatile int requestedRefreshRateHz = 30;
 
     public static File getGameDir() {
         return new File(Environment.getExternalStorageDirectory(), GAME_FOLDER_NAME);
@@ -120,6 +123,7 @@ public class GameActivity extends SDLActivity {
         if (missingGameFiles) {
             return;
         }
+        applyDisplayRefreshRate(requestedRefreshRateHz);
         super.resumeNativeThread();
     }
 
@@ -128,7 +132,117 @@ public class GameActivity extends SDLActivity {
         if (missingGameFiles) {
             return;
         }
+        if (hasFocus) {
+            applyDisplayRefreshRate(requestedRefreshRateHz);
+        }
         super.onWindowFocusChanged(hasFocus);
+    }
+
+    /**
+     * Called from C++ (CJavaWrapper::SetTargetRefreshRate) on the SDL thread
+     * whenever the user changes Target FPS or Frame Limiter in reVC settings.
+     * fps <= 0 requests the panel's highest native refresh rate.
+     */
+    public void setTargetRefreshRate(final int fps) {
+        requestedRefreshRateHz = fps;
+        runOnUiThread(() -> applyDisplayRefreshRate(fps));
+    }
+
+    private void applyDisplayRefreshRate(int targetFps) {
+        if (isFinishing() || isDestroyed()) {
+            return;
+        }
+
+        Display display = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+                ? getDisplay()
+                : getWindowManager().getDefaultDisplay();
+
+        float chosenHz = (targetFps > 0) ? (float) targetFps : 0.0f;
+        int bestModeId = 0;
+
+        if (display != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Display.Mode currentMode = display.getMode();
+            Display.Mode[] modes = display.getSupportedModes();
+            if (currentMode != null && modes != null && modes.length > 0) {
+                int curW = currentMode.getPhysicalWidth();
+                int curH = currentMode.getPhysicalHeight();
+
+                if (targetFps <= 0) {
+                    // Native mode: select highest refresh rate matching current physical resolution.
+                    float maxHz = 0.0f;
+                    for (Display.Mode m : modes) {
+                        if (m.getPhysicalWidth() == curW && m.getPhysicalHeight() == curH) {
+                            if (m.getRefreshRate() > maxHz) {
+                                maxHz = m.getRefreshRate();
+                                bestModeId = m.getModeId();
+                            }
+                        }
+                    }
+                    chosenHz = maxHz;
+                } else {
+                    // Prefer an exact or integer-multiple refresh mode (e.g. 60 Hz or 120 Hz for 60 FPS,
+                    // 120 Hz or 60 Hz for 30 FPS) so frame pacing is judder-free on LTPO panels.
+                    float bestScore = Float.MAX_VALUE;
+                    for (Display.Mode m : modes) {
+                        if (m.getPhysicalWidth() != curW || m.getPhysicalHeight() != curH) {
+                            continue;
+                        }
+                        float hz = m.getRefreshRate();
+                        float directDiff = Math.abs(hz - targetFps);
+                        float score;
+                        if (directDiff < 1.5f) {
+                            // Exact panel refresh match (e.g. 60 Hz for 60 FPS, 120 Hz for 120 FPS)
+                            score = directDiff;
+                        } else if (hz >= targetFps) {
+                            int mult = Math.round(hz / (float) targetFps);
+                            if (mult >= 1 && Math.abs(hz - (targetFps * mult)) < 2.0f) {
+                                // Clean integer multiple (e.g. 60 Hz for 30 FPS -> mult=2)
+                                score = 10.0f + mult;
+                            } else {
+                                score = 100.0f + (hz - targetFps);
+                            }
+                        } else {
+                            // Lower than requested FPS: only pick if nothing >= targetFps exists
+                            score = 1000.0f + (targetFps - hz);
+                        }
+
+                        if (score < bestScore) {
+                            bestScore = score;
+                            bestModeId = m.getModeId();
+                            chosenHz = hz;
+                        }
+                    }
+                }
+            }
+        }
+
+        WindowManager.LayoutParams lp = getWindow().getAttributes();
+        boolean changed = false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && bestModeId != 0 && lp.preferredDisplayModeId != bestModeId) {
+            lp.preferredDisplayModeId = bestModeId;
+            changed = true;
+        }
+        if (chosenHz > 0.0f && Math.abs(lp.preferredRefreshRate - chosenHz) > 0.1f) {
+            lp.preferredRefreshRate = chosenHz;
+            changed = true;
+        }
+        if (changed) {
+            getWindow().setAttributes(lp);
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && mSurface != null) {
+            Surface surface = mSurface.getNativeSurface();
+            if (surface != null && surface.isValid()) {
+                float surfaceFps = (targetFps > 0) ? (float) targetFps : 0.0f;
+                int compatibility = (targetFps > 0)
+                        ? Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE
+                        : Surface.FRAME_RATE_COMPATIBILITY_DEFAULT;
+                try {
+                    surface.setFrameRate(surfaceFps, compatibility);
+                } catch (Throwable ignored) {
+                }
+            }
+        }
     }
 
     @Override

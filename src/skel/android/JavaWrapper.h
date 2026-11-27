@@ -31,6 +31,7 @@ public:
 
     // static methods
     static JNIEnv* GetEnv();
+    static void SetTargetRefreshRate(int fps);
 };
 
 extern CJavaWrapper* g_pJavaWrapper;

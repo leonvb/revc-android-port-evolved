@@ -48,6 +48,9 @@
 #include "Population.h"
 #include "IniFile.h"
 #include "Zones.h"
+#ifdef MODERN_FEATURES
+#include "ModernConfig.h"
+#endif
 
 #include "crossplatform.h"
 
@@ -575,6 +578,36 @@ bool LoadINISettings()
 	ReadIniIfExists("General", "NoMovies", &gbNoMovies);
 #endif
 
+#ifdef MODERN_FEATURES
+	ReadIniIfExists("Modern", "Preset", &CModernConfig::m_nPreset);
+	ReadIniIfExists("Modern", "MasterEnable", &CModernConfig::m_bMasterEnable);
+	ReadIniIfExists("Modern", "TargetFPS", &CModernConfig::m_nTargetFPS);
+	ReadIniIfExists("Modern", "HighFpsPhysicsFix", &CModernConfig::m_bHighFpsPhysicsFix);
+	ReadIniIfExists("Modern", "DrivingStyle", &CModernConfig::m_nDrivingStyle);
+	ReadIniIfExists("Modern", "MidAirControl", &CModernConfig::m_bMidAirControl);
+	ReadIniIfExists("Modern", "GpsRouteMode", &CModernConfig::m_nGpsRouteMode);
+	ReadIniIfExists("Modern", "Autosave", &CModernConfig::m_bAutosave);
+	ReadIniIfExists("Modern", "FastInteriorFades", &CModernConfig::m_bFastInteriorFades);
+	ReadIniIfExists("Modern", "ModernVehicleCam", &CModernConfig::m_bModernVehicleCam);
+	ReadIniIfExists("Modern", "AimMode", &CModernConfig::m_nAimMode);
+	ReadIniIfExists("Modern", "RightShoulder", &CModernConfig::m_bRightShoulder);
+	ReadIniIfExists("Modern", "WeaponRadioWheels", &CModernConfig::m_bWeaponRadioWheels);
+	ReadIniIfExists("Modern", "VehCamAutoCenterDelay", &CModernConfig::m_fVehCamAutoCenterDelay);
+	ReadIniIfExists("Modern", "HapticsIntensity", &CModernConfig::m_nHapticsIntensity);
+	ReadIniIfExists("Modern", "GyroAimMode", &CModernConfig::m_nGyroAimMode);
+	ReadIniIfExists("Modern", "GyroSensitivity", &CModernConfig::m_fGyroSensitivity);
+	ReadIniIfExists("Modern", "HoldToSprint", &CModernConfig::m_bHoldToSprint);
+	ReadIniIfExists("Modern", "Swimming", &CModernConfig::m_bSwimming);
+	ReadIniIfExists("Modern", "LedgeMantling", &CModernConfig::m_bLedgeMantling);
+	ReadIniIfExists("Modern", "MaxMantleHeight", &CModernConfig::m_fMaxMantleHeight);
+	ReadIniIfExists("Modern", "LodDistMultiplier", &CModernConfig::m_fLodDistMultiplier);
+	ReadIniIfExists("Modern", "NeonBloom", &CModernConfig::m_nNeonBloom);
+	ReadIniIfExists("Modern", "FXAA", &CModernConfig::m_bFxaa);
+	ReadIniIfExists("Modern", "DynamicPointLights", &CModernConfig::m_bDynamicPointLights);
+	ReadIniIfExists("Modern", "WetRoadReflections", &CModernConfig::m_bWetRoadReflections);
+	ReadIniIfExists("Modern", "RealtimeShadows", &CModernConfig::m_nRealtimeShadows);
+#endif
+
 #ifdef CUSTOM_FRONTEND_OPTIONS
 	bool migrate = cfg.get("FrontendOptions").size() != 0;
 	for (int i = 0; i < MENUPAGES; i++) {
@@ -607,6 +640,10 @@ bool LoadINISettings()
 	CPopulation::MaxNumberOfPedsInUse = DEFAULT_MAX_NUMBER_OF_PEDS * CIniFile::PedNumberMultiplier;
 	CPopulation::MaxNumberOfPedsInUseInterior = DEFAULT_MAX_NUMBER_OF_PEDS_INTERIOR * CIniFile::PedNumberMultiplier;
 	CCarCtrl::MaxNumberOfCarsInUse = DEFAULT_MAX_NUMBER_OF_CARS * CIniFile::CarNumberMultiplier;
+#endif
+
+#ifdef MODERN_FEATURES
+	CModernConfig::ApplyFrameRateSettings();
 #endif
 
 	return true;
@@ -682,6 +719,35 @@ void SaveINISettings()
 #endif
 #ifdef NO_MOVIES
 	StoreIni("General", "NoMovies", gbNoMovies);
+#endif
+#ifdef MODERN_FEATURES
+	StoreIni("Modern", "Preset", CModernConfig::m_nPreset);
+	StoreIni("Modern", "MasterEnable", CModernConfig::m_bMasterEnable);
+	StoreIni("Modern", "TargetFPS", CModernConfig::m_nTargetFPS);
+	StoreIni("Modern", "HighFpsPhysicsFix", CModernConfig::m_bHighFpsPhysicsFix);
+	StoreIni("Modern", "DrivingStyle", CModernConfig::m_nDrivingStyle);
+	StoreIni("Modern", "MidAirControl", CModernConfig::m_bMidAirControl);
+	StoreIni("Modern", "GpsRouteMode", CModernConfig::m_nGpsRouteMode);
+	StoreIni("Modern", "Autosave", CModernConfig::m_bAutosave);
+	StoreIni("Modern", "FastInteriorFades", CModernConfig::m_bFastInteriorFades);
+	StoreIni("Modern", "ModernVehicleCam", CModernConfig::m_bModernVehicleCam);
+	StoreIni("Modern", "AimMode", CModernConfig::m_nAimMode);
+	StoreIni("Modern", "RightShoulder", CModernConfig::m_bRightShoulder);
+	StoreIni("Modern", "WeaponRadioWheels", CModernConfig::m_bWeaponRadioWheels);
+	StoreIni("Modern", "VehCamAutoCenterDelay", CModernConfig::m_fVehCamAutoCenterDelay);
+	StoreIni("Modern", "HapticsIntensity", CModernConfig::m_nHapticsIntensity);
+	StoreIni("Modern", "GyroAimMode", CModernConfig::m_nGyroAimMode);
+	StoreIni("Modern", "GyroSensitivity", CModernConfig::m_fGyroSensitivity);
+	StoreIni("Modern", "HoldToSprint", CModernConfig::m_bHoldToSprint);
+	StoreIni("Modern", "Swimming", CModernConfig::m_bSwimming);
+	StoreIni("Modern", "LedgeMantling", CModernConfig::m_bLedgeMantling);
+	StoreIni("Modern", "MaxMantleHeight", CModernConfig::m_fMaxMantleHeight);
+	StoreIni("Modern", "LodDistMultiplier", CModernConfig::m_fLodDistMultiplier);
+	StoreIni("Modern", "NeonBloom", CModernConfig::m_nNeonBloom);
+	StoreIni("Modern", "FXAA", CModernConfig::m_bFxaa);
+	StoreIni("Modern", "DynamicPointLights", CModernConfig::m_bDynamicPointLights);
+	StoreIni("Modern", "WetRoadReflections", CModernConfig::m_bWetRoadReflections);
+	StoreIni("Modern", "RealtimeShadows", CModernConfig::m_nRealtimeShadows);
 #endif
 #ifdef CUSTOM_FRONTEND_OPTIONS
 	for (int i = 0; i < MENUPAGES; i++) {
@@ -1051,6 +1117,15 @@ DebugMenuPopulate(void)
 		DebugMenuAddVarBool8("Render", "Frame limiter", &FrontEndMenuManager.m_PrefsFrameLimiter, nil);
 		DebugMenuAddVarBool8("Render", "VSynch", &FrontEndMenuManager.m_PrefsVsync, nil);
 		DebugMenuAddVar("Render", "Max FPS", &RsGlobal.maxFPS, nil, 1, 1, 1000, nil);
+#ifdef MODERN_FEATURES
+		static const char *dbgPresets[] = { "Classic", "Modern", "Custom" };
+		e = DebugMenuAddVar("Modern", "Preset", &CModernConfig::m_nPreset, [](){ CModernConfig::ApplyPreset(CModernConfig::m_nPreset); }, 1, MODERN_PRESET_CLASSIC, MODERN_PRESET_CUSTOM, dbgPresets);
+		DebugMenuEntrySetWrap(e, true);
+		DebugMenuAddVarBool8("Modern", "Master Enable", &CModernConfig::m_bMasterEnable, nil);
+		static const char *dbgFps[] = { "30 FPS", "60 FPS", "90 FPS", "120 FPS", "Native" };
+		e = DebugMenuAddVar("Modern", "Target FPS", &CModernConfig::m_nTargetFPS, CModernConfig::ApplyFrameRateSettings, 1, MODERN_FPS_30, MODERN_FPS_NATIVE, dbgFps);
+		DebugMenuEntrySetWrap(e, true);
+#endif
 #ifdef NEW_RENDERER
 		DebugMenuAddVarBool8("Render", "New Renderer", &gbNewRenderer, nil);
 extern bool gbRenderRoads;
