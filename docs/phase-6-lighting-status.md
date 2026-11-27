@@ -10,10 +10,12 @@ when it has a valid rendered frame, and a point-light specular term. Environment
 map rendering itself uses the classic pipeline to avoid feedback. Missing
 shaders/normals fall back to the existing renderer, and Classic is unchanged.
 
-GL/GLES also supports the rim-ped (including skinned) and Neo-vehicle pipes.
-This is not yet full M6.3/M6.4: D3D9 ped/vehicle shaders are being compiled,
-vehicles using the classic MatFX pipe do not yet receive these pixel lights,
-the alternate `NEW_RENDERER` building path bypasses these pipes, and the road
-reflection is a local environment-map/sky approximation rather than a planar
-scene reflection. GPU/image/performance testing remains open.
+Both backends also support the rim-ped (including skinned) and Neo-vehicle
+pipes, and opaque meshes in the alternate `NEW_RENDERER` building path.
+This is not yet full M6.3/M6.4: vehicles using the classic MatFX pipe and
+deferred transparent building meshes do not yet receive these pixel lights,
+and the road reflection is a local environment-map/sky approximation rather
+than a planar scene reflection. If the alternate renderer's legacy 2,000-entry
+per-pass deferred list fills, further transparent entries are dropped instead
+of writing past its bounds. GPU/image/performance testing remains open.
 M6.5 directional shadow mapping remains unimplemented.

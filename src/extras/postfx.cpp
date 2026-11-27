@@ -540,7 +540,10 @@ EnsureModernBloom(int width, int height)
 	CloseModernBloom();
 	int maxSize;
 #ifdef RW_OPENGL
-	maxSize = rw::gl3::maxTextureSize;
+	// maxTextureSize is a native-texture conversion override, not a device cap.
+	GLint glMaxSize = 0;
+	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &glMaxSize);
+	maxSize = glMaxSize;
 #else
 	D3DCAPS9 caps;
 	if(FAILED(rw::d3d::d3ddevice->GetDeviceCaps(&caps))) return false;

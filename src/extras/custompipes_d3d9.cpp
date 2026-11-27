@@ -121,7 +121,13 @@ vehicleRenderCB(rw::Atomic *atomic, rw::d3d9::InstanceDataHeader *header)
 	uploadSpecLights();
 	uploadMatrices(atomic->getFrame()->getLTM());
 
+#ifdef MODERN_FEATURES
+	bool useModern = UseModernLights(atomic, modernVehicle_VS, modernVehicle_PS);
+	if(useModern) UploadModernLights(atomic);
+	setVertexShader(useModern ? modernVehicle_VS : neoVehicle_VS);
+#else
 	setVertexShader(neoVehicle_VS);
+#endif
 
 	V3d eyePos = rw::engine->currentCamera->getFrame()->getLTM()->pos;
 	d3ddevice->SetVertexShaderConstantF(VSLOC_eye, (float*)&eyePos, 1);
@@ -150,7 +156,11 @@ vehicleRenderCB(rw::Atomic *atomic, rw::d3d9::InstanceDataHeader *header)
 			d3d::setTexture(0, m->texture);
 		else
 			d3d::setTexture(0, gpWhiteTexture);
+#ifdef MODERN_FEATURES
+		setPixelShader(useModern ? modernVehicle_PS : neoVehicle_PS);
+#else
 		setPixelShader(neoVehicle_PS);
+#endif
 
 		drawInst(header, inst);
 		inst++;
@@ -181,6 +191,12 @@ CreateVehiclePipe(void)
 #include "shaders/obj/neoVehicle_PS.inc"
 	neoVehicle_PS = rw::d3d::createPixelShader(neoVehicle_PS_cso);
 	assert(neoVehicle_PS);
+#ifdef MODERN_FEATURES
+#include "shaders/obj/modernVehicle_VS.inc"
+#include "shaders/obj/modernVehicle_PS.inc"
+	modernVehicle_VS = rw::d3d::createVertexShader(modernVehicle_VS_cso);
+	modernVehicle_PS = rw::d3d::createPixelShader(modernVehicle_PS_cso);
+#endif
 
 
 	rw::d3d9::ObjPipeline *pipe = rw::d3d9::ObjPipeline::create();
@@ -193,6 +209,10 @@ CreateVehiclePipe(void)
 void
 DestroyVehiclePipe(void)
 {
+#ifdef MODERN_FEATURES
+	rw::d3d::destroyVertexShader(modernVehicle_VS); modernVehicle_VS = nil;
+	rw::d3d::destroyPixelShader(modernVehicle_PS); modernVehicle_PS = nil;
+#endif
 	rw::d3d::destroyVertexShader(neoVehicle_VS);
 	neoVehicle_VS = nil;
 

@@ -45,32 +45,17 @@ jobs:
             $checkedIn = (Get-FileHash "src/extras/shaders/obj/modernWorld_$stage.cso" -Algorithm SHA256).Hash
             if ($built -ne $checkedIn) { throw "Modern world $stage bytecode differs from source" }
           }
-      - name: Compile local lighting SM3 and expose temporary bytecode
+      - name: Compile and verify local lighting SM3
         shell: pwsh
         run: |
           $fxc = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\fxc.exe" | Sort-Object FullName -Descending | Select-Object -First 1
-          foreach ($shader in @('modernPed_VS', 'modernPedSkin_VS', 'modernVehicle_VS', 'modernPed_PS')) {
+          foreach ($shader in @('modernPed_VS', 'modernPedSkin_VS', 'modernVehicle_VS', 'modernPed_PS', 'modernVehicle_PS')) {
             $target = if ($shader.EndsWith('_VS')) { 'vs_3_0' } else { 'ps_3_0' }
             & $fxc.FullName /nologo /T $target /E main /Fo "$shader.cso" "src/extras/shaders/$shader.hlsl"
             if ($LASTEXITCODE -ne 0) { throw "$shader compilation failed" }
-            $data = [Convert]::ToBase64String([IO.File]::ReadAllBytes("$shader.cso"))
-            $chunks = [Math]::Ceiling($data.Length / 2000.0)
-            for ($i = 0; $i -lt $chunks; $i++) {
-              $part = $data.Substring($i * 2000, [Math]::Min(2000, $data.Length - $i * 2000))
-              Write-Output "::notice title=$shader part $i of $chunks::$part"
-            }
-          }
-      - name: Compile vehicle lighting SM3 and expose temporary bytecode
-        shell: pwsh
-        run: |
-          $fxc = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\fxc.exe" | Sort-Object FullName -Descending | Select-Object -First 1
-          & $fxc.FullName /nologo /T ps_3_0 /E main /Fo modernVehicle_PS.cso src/extras/shaders/modernVehicle_PS.hlsl
-          if ($LASTEXITCODE -ne 0) { throw "modernVehicle_PS compilation failed" }
-          $data = [Convert]::ToBase64String([IO.File]::ReadAllBytes("modernVehicle_PS.cso"))
-          $chunks = [Math]::Ceiling($data.Length / 2000.0)
-          for ($i = 0; $i -lt $chunks; $i++) {
-            $part = $data.Substring($i * 2000, [Math]::Min(2000, $data.Length - $i * 2000))
-            Write-Output "::notice title=modernVehicle_PS part $i of $chunks::$part"
+            $built = (Get-FileHash "$shader.cso" -Algorithm SHA256).Hash
+            $checkedIn = (Get-FileHash "src/extras/shaders/obj/$shader.cso" -Algorithm SHA256).Hash
+            if ($built -ne $checkedIn) { throw "$shader bytecode differs from source" }
           }
       - uses: actions/upload-artifact@v4
         with:

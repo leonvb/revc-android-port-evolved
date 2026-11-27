@@ -53,6 +53,14 @@ for stage, magic in (('VS', '0003feff'), ('PS', '0003ffff')):
     if code != embedded or code[:4] != bytes.fromhex(magic) or code[-4:] != bytes.fromhex('ffff0000'):
         raise SystemExit(name + '.inc is stale or not complete SM3 bytecode')
 
+for name in ('modernPed_VS', 'modernPedSkin_VS', 'modernVehicle_VS', 'modernPed_PS', 'modernVehicle_PS'):
+    code = (shader_dir / ('obj/' + name + '.cso')).read_bytes()
+    inc = (shader_dir / ('obj/' + name + '.inc')).read_text()
+    embedded = bytes(int(v, 16) for v in re.findall(r'0x([0-9a-fA-F]{2})', inc))
+    magic = '0003feff' if name.endswith('_VS') else '0003ffff'
+    if code != embedded or code[:4] != bytes.fromhex(magic) or code[-4:] != bytes.fromhex('ffff0000'):
+        raise SystemExit(name + '.inc is stale or not complete SM3 bytecode')
+
 
 def load_c_string(path):
     text = path.read_text()
