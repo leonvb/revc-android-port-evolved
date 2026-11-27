@@ -32,11 +32,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: true
-      - name: "Test GPS road search"
+      - name: "Test standalone modern feature policies"
         if: runner.os == 'Linux'
         run: |
           c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g tests/gps_path_search.cpp -o /tmp/gps_path_search
           /tmp/gps_path_search
+          c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g tests/modern_visual_policy.cpp -o /tmp/modern_visual_policy
+          /tmp/modern_visual_policy
+          c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g tests/modern_postfx_policy.cpp -o /tmp/modern_postfx_policy
+          /tmp/modern_postfx_policy
       - name: "Checkout Miles SDK Import Library project"
         uses: actions/checkout@v4
         if: ${{ matrix.audio == 'miles' }}

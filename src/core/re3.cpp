@@ -603,6 +603,7 @@ bool LoadINISettings()
 	ReadIniIfExists("Modern", "LodDistMultiplier", &CModernConfig::m_fLodDistMultiplier);
 	ReadIniIfExists("Modern", "NeonBloom", &CModernConfig::m_nNeonBloom);
 	ReadIniIfExists("Modern", "FXAA", &CModernConfig::m_bFxaa);
+	ReadIniIfExists("Modern", "ExperimentalEdgeAA", &CModernConfig::m_bExperimentalEdgeAA);
 	ReadIniIfExists("Modern", "DynamicPointLights", &CModernConfig::m_bDynamicPointLights);
 	ReadIniIfExists("Modern", "WetRoadReflections", &CModernConfig::m_bWetRoadReflections);
 	ReadIniIfExists("Modern", "RealtimeShadows", &CModernConfig::m_nRealtimeShadows);
@@ -745,6 +746,7 @@ void SaveINISettings()
 	StoreIni("Modern", "LodDistMultiplier", CModernConfig::m_fLodDistMultiplier);
 	StoreIni("Modern", "NeonBloom", CModernConfig::m_nNeonBloom);
 	StoreIni("Modern", "FXAA", CModernConfig::m_bFxaa);
+	StoreIni("Modern", "ExperimentalEdgeAA", CModernConfig::m_bExperimentalEdgeAA);
 	StoreIni("Modern", "DynamicPointLights", CModernConfig::m_bDynamicPointLights);
 	StoreIni("Modern", "WetRoadReflections", CModernConfig::m_bWetRoadReflections);
 	StoreIni("Modern", "RealtimeShadows", CModernConfig::m_nRealtimeShadows);

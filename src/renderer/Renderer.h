@@ -3,6 +3,14 @@
 
 class CEntity;
 
+// Extended views can contain many more entities. These are transient render
+// pointers only; no world pool or save-game structure is enlarged.
+#ifdef MODERN_FEATURES
+#define RENDER_VISIBLE_CAPACITY (NUMVISIBLEENTITIES * 3)
+#else
+#define RENDER_VISIBLE_CAPACITY NUMVISIBLEENTITIES
+#endif
+
 #ifdef FIX_BUGS
 #define LOD_DISTANCE (300.0f*TheCamera.LODDistMultiplier)
 #else
@@ -36,15 +44,15 @@ struct BlockedRange
 class CRenderer
 {
 	static int32 ms_nNoOfVisibleEntities;
-	static CEntity *ms_aVisibleEntityPtrs[NUMVISIBLEENTITIES];
+	static CEntity *ms_aVisibleEntityPtrs[RENDER_VISIBLE_CAPACITY];
 	static int32 ms_nNoOfInVisibleEntities;
 	static CEntity *ms_aInVisibleEntityPtrs[NUMINVISIBLEENTITIES];
 #ifdef NEW_RENDERER
 	static int32 ms_nNoOfVisibleVehicles;
-	static CEntity *ms_aVisibleVehiclePtrs[NUMVISIBLEENTITIES];
+	static CEntity *ms_aVisibleVehiclePtrs[RENDER_VISIBLE_CAPACITY];
 	// for cWorldStream emulation
 	static int32 ms_nNoOfVisibleBuildings;
-	static CEntity *ms_aVisibleBuildingPtrs[NUMVISIBLEENTITIES];
+	static CEntity *ms_aVisibleBuildingPtrs[RENDER_VISIBLE_CAPACITY];
 #endif
 
 	static CVUVECTOR ms_vecCameraPosition;

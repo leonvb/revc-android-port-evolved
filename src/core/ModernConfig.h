@@ -96,6 +96,7 @@ public:
 	static float m_fLodDistMultiplier; // 1.0f..4.0f (default: 1.0f in Classic)
 	static int8 m_nNeonBloom;          // 0 = Off, 1 = Low, 2 = High
 	static int8 m_bFxaa;               // 0/1
+	static int8 m_bExperimentalEdgeAA; // opt-in preview, not FXAA 3.11
 	static int8 m_bDynamicPointLights; // 0/1
 	static int8 m_bWetRoadReflections; // 0/1
 	static int8 m_nRealtimeShadows;    // 0 = Classic, 1 = Medium, 2 = High
@@ -110,6 +111,9 @@ public:
 	static bool ShouldFrameLimitGameplay();
 	static bool ShouldWaitVSyncInGameplay();
 	static void ApplyFrameRateSettings();
+
+	// Phase 6: master-off and invalid values must always behave like Classic.
+	static float GetLodDistanceMultiplier();
 
 	// Phase 1 (M1.1 / M1.2) runtime feature predicates
 	static bool IsHighFpsPhysicsFixEnabled() { return m_bMasterEnable != 0 && m_bHighFpsPhysicsFix != 0; }

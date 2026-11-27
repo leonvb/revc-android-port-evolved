@@ -53,14 +53,14 @@ struct EntityInfo
 CLinkList<EntityInfo> gSortedVehiclesAndPeds;
 
 int32 CRenderer::ms_nNoOfVisibleEntities;
-CEntity *CRenderer::ms_aVisibleEntityPtrs[NUMVISIBLEENTITIES];
+CEntity *CRenderer::ms_aVisibleEntityPtrs[RENDER_VISIBLE_CAPACITY];
 CEntity *CRenderer::ms_aInVisibleEntityPtrs[NUMINVISIBLEENTITIES];
 int32 CRenderer::ms_nNoOfInVisibleEntities;
 #ifdef NEW_RENDERER
 int32 CRenderer::ms_nNoOfVisibleVehicles;
-CEntity *CRenderer::ms_aVisibleVehiclePtrs[NUMVISIBLEENTITIES];
+CEntity *CRenderer::ms_aVisibleVehiclePtrs[RENDER_VISIBLE_CAPACITY];
 int32 CRenderer::ms_nNoOfVisibleBuildings;
-CEntity *CRenderer::ms_aVisibleBuildingPtrs[NUMVISIBLEENTITIES];
+CEntity *CRenderer::ms_aVisibleBuildingPtrs[RENDER_VISIBLE_CAPACITY];
 #endif
 
 CVUVECTOR CRenderer::ms_vecCameraPosition;
@@ -1442,13 +1442,20 @@ CRenderer::InsertEntityIntoList(CEntity *ent)
 #endif
 
 #ifdef NEW_RENDERER
-	// TODO: there are more flags being checked here
-	if(gbNewRenderer && (ent->IsVehicle() || ent->IsPed()))
-		ms_aVisibleVehiclePtrs[ms_nNoOfVisibleVehicles++] = ent;
-	else if(gbNewRenderer && ent->IsBuilding())
-		ms_aVisibleBuildingPtrs[ms_nNoOfVisibleBuildings++] = ent;
-	else
+	// Wider view distances can exceed the fixed render lists. Drop excess
+	// entities instead of writing past the array on dense maps.
+	if(gbNewRenderer && (ent->IsVehicle() || ent->IsPed())) {
+		if (ms_nNoOfVisibleVehicles < RENDER_VISIBLE_CAPACITY)
+			ms_aVisibleVehiclePtrs[ms_nNoOfVisibleVehicles++] = ent;
+		return;
+	}
+	if(gbNewRenderer && ent->IsBuilding()) {
+		if (ms_nNoOfVisibleBuildings < RENDER_VISIBLE_CAPACITY)
+			ms_aVisibleBuildingPtrs[ms_nNoOfVisibleBuildings++] = ent;
+		return;
+	}
 #endif
+	if (ms_nNoOfVisibleEntities < RENDER_VISIBLE_CAPACITY)
 		ms_aVisibleEntityPtrs[ms_nNoOfVisibleEntities++] = ent;
 }
 

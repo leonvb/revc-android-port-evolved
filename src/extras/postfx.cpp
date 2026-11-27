@@ -12,6 +12,10 @@
 #include "Camera.h"
 #include "MBlur.h"
 #include "postfx.h"
+#ifdef MODERN_FEATURES
+#include "ModernConfig.h"
+#include "ModernPostFXPolicy.h"
+#endif
 
 RwRaster *CPostFX::pFrontBuffer;
 RwRaster *CPostFX::pBackBuffer;
@@ -27,6 +31,9 @@ static RwImVertexIndex Index[6] = { 0, 1, 2, 0, 2, 3 };
 #ifdef RW_D3D9
 void *colourfilterVC_PS;
 void *contrast_PS;
+#ifdef MODERN_FEATURES
+static void *modernAA_PS;
+#endif
 #endif
 #ifdef RW_OPENGL
 int32 u_blurcolor;
@@ -34,6 +41,10 @@ int32 u_contrastAdd;
 int32 u_contrastMult;
 rw::gl3::Shader *colourFilterVC;
 rw::gl3::Shader *contrast;
+#ifdef MODERN_FEATURES
+static int32 u_modernAA;
+static rw::gl3::Shader *modernAA;
+#endif
 #endif
 
 void
@@ -43,6 +54,9 @@ CPostFX::InitOnce(void)
 	u_blurcolor = rw::gl3::registerUniform("u_blurcolor");
 	u_contrastAdd = rw::gl3::registerUniform("u_contrastAdd");
 	u_contrastMult = rw::gl3::registerUniform("u_contrastMult");
+#ifdef MODERN_FEATURES
+	u_modernAA = rw::gl3::registerUniform("u_modernAA");
+#endif
 #endif
 }
 
@@ -150,6 +164,11 @@ CPostFX::Open(RwCamera *cam)
 	colourfilterVC_PS = rw::d3d::createPixelShader(colourfilterVC_PS_cso);
 #include "shaders/obj/contrastPS.inc"
 	contrast_PS = rw::d3d::createPixelShader(contrastPS_cso);
+#ifdef MODERN_FEATURES
+#include "shaders/obj/modernAA_PS.inc"
+	modernAA_PS = rw::d3d::createPixelShader(modernAA_PS_cso);
+	// Unsupported shader model or device: leave the effect disabled.
+#endif
 #endif
 #ifdef RW_OPENGL
 	using namespace rw::gl3;
@@ -171,6 +190,15 @@ CPostFX::Open(RwCamera *cam)
 	contrast = Shader::create(vs, fs);
 	assert(contrast);
 	}
+#ifdef MODERN_FEATURES
+	{
+#include "shaders/obj/im2d_vert.inc"
+#include "shaders/obj/modernAA_frag.inc"
+	const char *vs[] = { shaderDecl, header_vert_src, im2d_vert_src, nil };
+	const char *fs[] = { shaderDecl, header_frag_src, modernAA_frag_src, nil };
+	modernAA = Shader::create(vs, fs); // nil means graceful fallback
+	}
+#endif
 
 #endif
 }
@@ -187,6 +215,12 @@ CPostFX::Close(void)
 		pBackBuffer = nil;
 	}
 #ifdef RW_D3D9
+#ifdef MODERN_FEATURES
+	if(modernAA_PS){
+		rw::d3d::destroyPixelShader(modernAA_PS);
+		modernAA_PS = nil;
+	}
+#endif
 	if(colourfilterVC_PS){
 		rw::d3d::destroyPixelShader(colourfilterVC_PS);
 		colourfilterVC_PS = nil;
@@ -197,6 +231,12 @@ CPostFX::Close(void)
 	}
 #endif
 #ifdef RW_OPENGL
+#ifdef MODERN_FEATURES
+	if(modernAA){
+		modernAA->destroy();
+		modernAA = nil;
+	}
+#endif
 	if(colourFilterVC){
 		colourFilterVC->destroy();
 		colourFilterVC = nil;
@@ -385,6 +425,61 @@ CPostFX::GetBackBuffer(RwCamera *cam)
 	RwRasterRenderFast(RwCameraGetRaster(cam), 0, 0);
 	RwRasterPopContext();
 }
+
+#ifdef MODERN_FEATURES
+void
+CPostFX::RenderExperimentalEdgeAA(RwCamera *cam)
+{
+#if defined(RW_OPENGL) || defined(RW_D3D9)
+	if (!CModernConfig::m_bMasterEnable || !CModernConfig::m_bExperimentalEdgeAA ||
+	    !cam || !RwCameraGetRaster(cam) || !pBackBuffer)
+		return;
+#ifdef RW_OPENGL
+	if (!modernAA) return;
+#else
+	if (!modernAA_PS) return;
+#endif
+	int width = RwRasterGetWidth(RwCameraGetRaster(cam));
+	int height = RwRasterGetHeight(RwCameraGetRaster(cam));
+	int texWidth = RwRasterGetWidth(pBackBuffer);
+	int texHeight = RwRasterGetHeight(pBackBuffer);
+	float params[4];
+	if (!ModernPostFXPolicy::CaptureParams(width, height, texWidth, texHeight, params))
+		return; // framebuffer has changed or the capture isn't usable
+
+	// Capture after world effects and motion blur, before HUD/menu rendering.
+	GetBackBuffer(cam);
+	DefinedState();
+	RwRenderStateSet(rwRENDERSTATEFOGENABLE, (void*)FALSE);
+	RwRenderStateSet(rwRENDERSTATEZTESTENABLE, (void*)FALSE);
+	RwRenderStateSet(rwRENDERSTATEZWRITEENABLE, (void*)FALSE);
+	RwRenderStateSet(rwRENDERSTATEVERTEXALPHAENABLE, (void*)FALSE);
+	RwRenderStateSet(rwRENDERSTATETEXTUREADDRESS, (void*)rwTEXTUREADDRESSCLAMP);
+	RwRenderStateSet(rwRENDERSTATETEXTUREFILTER, (void*)rwFILTERLINEAR);
+	RwRenderStateSet(rwRENDERSTATETEXTURERASTER, pBackBuffer);
+	for (int i = 0; i < 4; i++)
+		RwIm2DVertexSetIntRGBA(&Vertex[i], 255, 255, 255, 255);
+#ifdef RW_OPENGL
+	rw::gl3::im2dOverrideShader = modernAA;
+	modernAA->use();
+	glUniform4fv(modernAA->uniformLocations[u_modernAA], 1, params);
+#else
+	rw::d3d::d3ddevice->SetPixelShaderConstantF(10, params, 1);
+	rw::d3d::im2dOverridePS = modernAA_PS;
+#endif
+	RwIm2DRenderIndexedPrimitive(rwPRIMTYPETRILIST, Vertex, 4, Index, 6);
+#ifdef RW_OPENGL
+	rw::gl3::im2dOverrideShader = nil;
+#else
+	rw::d3d::im2dOverridePS = nil;
+#endif
+	RwRenderStateSet(rwRENDERSTATETEXTURERASTER, nil);
+	DefinedState();
+#else
+	(void)cam;
+#endif
+}
+#endif
 
 void
 CPostFX::Render(RwCamera *cam, uint32 red, uint32 green, uint32 blue, uint32 blur, int32 type, uint32 bluralpha)

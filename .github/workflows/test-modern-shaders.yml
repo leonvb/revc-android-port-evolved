@@ -1,0 +1,33 @@
+name: Validate modern shaders
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+jobs:
+  glsl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shader validator
+        run: sudo apt-get update && sudo apt-get install -y glslang-tools
+      - name: Validate desktop GL and GLES shader source
+        run: python3 tests/test_modern_shaders.py
+  hlsl:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile D3D9 shader model 3
+        shell: pwsh
+        run: |
+          $fxc = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\fxc.exe" | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $fxc) { throw 'Windows SDK fxc.exe not found' }
+          & $fxc.FullName /nologo /T ps_3_0 /E main /Fo modernAA_PS.cso src/extras/shaders/modernAA_PS.hlsl
+          if ($LASTEXITCODE -ne 0) { throw 'HLSL compilation failed' }
+          $built = (Get-FileHash modernAA_PS.cso -Algorithm SHA256).Hash
+          $checkedIn = (Get-FileHash src/extras/shaders/obj/modernAA_PS.cso -Algorithm SHA256).Hash
+          if ($built -ne $checkedIn) { throw 'Committed D3D9 shader bytecode differs from the compiled HLSL' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: modern-d3d9-shaders
+          path: modernAA_PS.cso
+          if-no-files-found: error

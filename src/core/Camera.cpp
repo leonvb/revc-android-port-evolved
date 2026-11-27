@@ -1,4 +1,8 @@
 #include "common.h"
+#ifdef MODERN_FEATURES
+#include "ModernConfig.h"
+#include "ModernVisualPolicy.h"
+#endif
 
 #include "main.h"
 #include "Draw.h"
@@ -67,6 +71,26 @@ enum
 // abbreviate a few things
 #define PLAYER (CWorld::Players[CWorld::PlayerInFocus].m_pPed)
 // NB: removed explicit TheCamera from all functions
+
+#ifdef MODERN_FEATURES
+float
+CCamera::GetModernLodMultiplier(void) const
+{
+	if (ActiveCam >= ARRAY_SIZE(Cams))
+		return 1.0f;
+	int mode = Cams[ActiveCam].Mode;
+	bool eligible = !CCutsceneMgr::IsRunning() && !CCutsceneMgr::IsCutsceneProcessing() &&
+	    !CGame::IsInInterior() && WhoIsInControlOfTheCamera == CAMCONTROL_GAME &&
+	    mode != CCam::MODE_TOPDOWN && mode != CCam::MODE_GTACLASSIC && mode != CCam::MODE_TOP_DOWN_PED;
+	return ModernVisualPolicy::SceneLodMultiplier(eligible, CModernConfig::GetLodDistanceMultiplier());
+}
+
+float
+CCamera::GetModernPopulationHorizon(void) const
+{
+	return ModernVisualPolicy::GenerationMultiplier(GetModernLodMultiplier());
+}
+#endif
 
 CCamera TheCamera;
 #ifdef PC_PLAYER_CONTROLS
@@ -630,6 +654,9 @@ CCamera::Process(void)
 		LODDistMultiplier = 1.0f;
 	GenerationDistMultiplier = LODDistMultiplier;
 	LODDistMultiplier *= CRenderer::ms_lodDistScale;
+#ifdef MODERN_FEATURES
+	LODDistMultiplier *= GetModernLodMultiplier();
+#endif
 
 	CDraw::SetNearClipZ(RwCameraGetNearClipPlane(m_pRwCamera));
 	CDraw::SetFarClipZ(RwCameraGetFarClipPlane(m_pRwCamera));

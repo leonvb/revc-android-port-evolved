@@ -1,4 +1,7 @@
 #include "common.h"
+#ifdef MODERN_FEATURES
+#include "ModernVisualPolicy.h"
+#endif
 #include <time.h>
 #include "rpmatfx.h"
 #include "rphanim.h"
@@ -77,6 +80,45 @@
 #include "VarConsole.h"
 #ifdef USE_OUR_VERSIONING
 #include "GitSHA1.h"
+#endif
+
+static float SceneFarClip()
+{
+#ifdef MODERN_FEATURES
+	return ModernVisualPolicy::FarClip(CTimeCycle::GetFarClip(), TheCamera.GetModernLodMultiplier());
+#else
+	return CTimeCycle::GetFarClip();
+#endif
+}
+
+static float SceneFogStart()
+{
+#ifdef MODERN_FEATURES
+	if (TheCamera.GetModernLodMultiplier() <= 1.0f) return CTimeCycle::GetFogStart();
+	float originalFar = CTimeCycle::GetFarClip();
+	return originalFar > 0.0f ? CTimeCycle::GetFogStart() * SceneFarClip() / originalFar : CTimeCycle::GetFogStart();
+#else
+	return CTimeCycle::GetFogStart();
+#endif
+}
+
+#ifdef MODERN_FEATURES
+static void PrepareModernSceneClip()
+{
+	static bool wasExtended;
+	static float lastExtendedFarClip;
+	bool extended = TheCamera.GetModernLodMultiplier() > 1.0f;
+	// A camera mode may have installed its own clip since the last frame.
+	// Only restore our previous value if it hasn't already been replaced.
+	if (ModernVisualPolicy::ShouldPrepareFarClip(extended, wasExtended, RwCameraGetFarClipPlane(Scene.camera), lastExtendedFarClip)) {
+		float farClip = SceneFarClip();
+		RwCameraSetFarClipPlane(Scene.camera, farClip);
+		CDraw::SetFarClipZ(farClip);
+		if (extended)
+			lastExtendedFarClip = farClip;
+	}
+	wasExtended = extended;
+}
 #endif
 
 GlobalScene Scene;
@@ -1596,6 +1638,9 @@ Idle(void *arg)
 			CRenderer::ClearForFrame();
 		}
 #endif
+#ifdef MODERN_FEATURES
+		PrepareModernSceneClip();
+#endif
 		CRenderer::ConstructRenderList();
 		tbEndTimer("CnstrRenderList");
 
@@ -1606,8 +1651,8 @@ Idle(void *arg)
 #ifdef FIX_BUGS
 		RwRenderStateSet(rwRENDERSTATEZWRITEENABLE, (void *)FALSE); // TODO: temp? this fixes OpenGL render but there should be a better place for this
 		// This has to be done BEFORE RwCameraBeginUpdate
-		RwCameraSetFarClipPlane(Scene.camera, CTimeCycle::GetFarClip());
-		RwCameraSetFogDistance(Scene.camera, CTimeCycle::GetFogStart());
+		RwCameraSetFarClipPlane(Scene.camera, SceneFarClip());
+		RwCameraSetFogDistance(Scene.camera, SceneFogStart());
 #endif
 
 		if(CWeather::LightningFlash && !CCullZones::CamNoRain()){
@@ -1623,8 +1668,8 @@ Idle(void *arg)
 		DefinedState();
 
 #ifndef FIX_BUGS
-		RwCameraSetFarClipPlane(Scene.camera, CTimeCycle::GetFarClip());
-		RwCameraSetFogDistance(Scene.camera, CTimeCycle::GetFogStart());
+		RwCameraSetFarClipPlane(Scene.camera, SceneFarClip());
+		RwCameraSetFogDistance(Scene.camera, SceneFogStart());
 #endif
 
 		tbStartTimer(0, "RenderScene");
@@ -1651,6 +1696,9 @@ Idle(void *arg)
 		tbStartTimer(0, "RenderMotionBlur");
 		TheCamera.RenderMotionBlur();
 		tbEndTimer("RenderMotionBlur");
+#if defined(MODERN_FEATURES) && defined(EXTENDED_COLOURFILTER)
+		CPostFX::RenderExperimentalEdgeAA(Scene.camera);
+#endif
 
 		tbStartTimer(0, "Render2dStuff");
 		Render2dStuff();
@@ -1930,6 +1978,9 @@ void TheGame(void)
 
 			PUSH_MEMID(MEMID_RENDER);
 
+#ifdef MODERN_FEATURES
+			PrepareModernSceneClip();
+#endif
 			CRenderer::ConstructRenderList();
 
 			if ((!FrontEndMenuManager.m_bMenuActive || FrontEndMenuManager.m_bRenderGameInMenu == true) && TheCamera.GetScreenFadeStatus() != FADE_2 )
@@ -1939,8 +1990,8 @@ void TheGame(void)
 
 #ifdef FIX_BUGS
 				// This has to be done BEFORE RwCameraBeginUpdate
-				RwCameraSetFarClipPlane(Scene.camera, CTimeCycle::GetFarClip());
-				RwCameraSetFogDistance(Scene.camera, CTimeCycle::GetFogStart());
+				RwCameraSetFarClipPlane(Scene.camera, SceneFarClip());
+				RwCameraSetFogDistance(Scene.camera, SceneFogStart());
 #endif
 
 				if (CWeather::LightningFlash && !CCullZones::CamNoRain())
@@ -1950,8 +2001,8 @@ void TheGame(void)
 
 				DefinedState();
 #ifndef FIX_BUGS
-				RwCameraSetFarClipPlane(Scene.camera, CTimeCycle::GetFarClip());
-				RwCameraSetFogDistance(Scene.camera, CTimeCycle::GetFogStart());
+				RwCameraSetFarClipPlane(Scene.camera, SceneFarClip());
+				RwCameraSetFogDistance(Scene.camera, SceneFogStart());
 #endif
 
 				RenderScene();
@@ -1961,6 +2012,9 @@ void TheGame(void)
 				if ((TheCamera.m_BlurType == MOTION_BLUR_NONE || TheCamera.m_BlurType == MOTION_BLUR_LIGHT_SCENE) && TheCamera.m_ScreenReductionPercentage > 0.0f)
 					TheCamera.SetMotionBlurAlpha(150);
 				TheCamera.RenderMotionBlur();
+#if defined(MODERN_FEATURES) && defined(EXTENDED_COLOURFILTER)
+				CPostFX::RenderExperimentalEdgeAA(Scene.camera);
+#endif
 
 				Render2dStuff();
 			}
