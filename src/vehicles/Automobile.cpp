@@ -48,6 +48,10 @@
 #include "PlayerPed.h"
 #include "Object.h"
 #include "Automobile.h"
+#ifdef MODERN_FEATURES
+#include "ModernConfig.h"
+#include "ModernVehiclePhysics.h"
+#endif
 #include "Bike.h"
 #include "Wanted.h"
 #include "SaveBuf.h"
@@ -901,6 +905,10 @@ CAutomobile::ProcessControl(void)
 			}
 		}
 
+#ifdef MODERN_FEATURES
+		CModernVehiclePhysics::UpdateCarPreWheel(this, m_nWheelsOnGround);
+#endif
+
 		float traction;
 		if(GetStatus() == STATUS_PHYSICS)
 			traction = 0.004f * m_fTraction;
@@ -1024,33 +1032,41 @@ CAutomobile::ProcessControl(void)
 		// Process front wheels off ground
 
 		if(!IsRealHeli()){
+#ifdef MODERN_FEATURES
+			const bool bFixAirWheel = CModernConfig::IsHighFpsPhysicsFixEnabled();
+			const float airSpinRatio = bFixAirWheel ? CTimer::GetTimeStepRatio30() : 1.0f;
+			const float airSpinDecay = bFixAirWheel ? CTimer::PowTimeStep(0.95f) : 0.95f;
+#else
+			const float airSpinRatio = 1.0f;
+			const float airSpinDecay = 0.95f;
+#endif
 			if(m_aWheelTimer[CARWHEEL_FRONT_LEFT] <= 0.0f){
 				if(mod_HandlingManager.HasFrontWheelDrive(pHandling->nIdentifier) && acceleration != 0.0f){
 					if(acceleration > 0.0f){
 						if(m_aWheelSpeed[CARWHEEL_FRONT_LEFT] < 2.0f)
-							m_aWheelSpeed[CARWHEEL_FRONT_LEFT] -= 0.2f;
+							m_aWheelSpeed[CARWHEEL_FRONT_LEFT] -= 0.2f * airSpinRatio;
 					}else{
 						if(m_aWheelSpeed[CARWHEEL_FRONT_LEFT] > -2.0f)
-							m_aWheelSpeed[CARWHEEL_FRONT_LEFT] += 0.1f;
+							m_aWheelSpeed[CARWHEEL_FRONT_LEFT] += 0.1f * airSpinRatio;
 					}
 				}else{
-					m_aWheelSpeed[CARWHEEL_FRONT_LEFT] *= 0.95f;
+					m_aWheelSpeed[CARWHEEL_FRONT_LEFT] *= airSpinDecay;
 				}
-				m_aWheelRotation[CARWHEEL_FRONT_LEFT] += m_aWheelSpeed[CARWHEEL_FRONT_LEFT];
+				m_aWheelRotation[CARWHEEL_FRONT_LEFT] += m_aWheelSpeed[CARWHEEL_FRONT_LEFT] * airSpinRatio;
 			}
 			if(m_aWheelTimer[CARWHEEL_FRONT_RIGHT] <= 0.0f){
 				if(mod_HandlingManager.HasFrontWheelDrive(pHandling->nIdentifier) && acceleration != 0.0f){
 					if(acceleration > 0.0f){
 						if(m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] < 2.0f)
-							m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] -= 0.2f;
+							m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] -= 0.2f * airSpinRatio;
 					}else{
 						if(m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] > -2.0f)
-							m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] += 0.1f;
+							m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] += 0.1f * airSpinRatio;
 					}
 				}else{
-					m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] *= 0.95f;
+					m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] *= airSpinDecay;
 				}
-				m_aWheelRotation[CARWHEEL_FRONT_RIGHT] += m_aWheelSpeed[CARWHEEL_FRONT_RIGHT];
+				m_aWheelRotation[CARWHEEL_FRONT_RIGHT] += m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] * airSpinRatio;
 			}
 		}
 		}
@@ -1078,8 +1094,13 @@ CAutomobile::ProcessControl(void)
 			}else if(m_doingBurnout && mod_HandlingManager.HasRearWheelDrive(pHandling->nIdentifier)){
 				rearBrake = 0.0f;
 				rearTraction = 0.0f;
+#ifdef MODERN_FEATURES
+				float burnoutScale = CModernConfig::IsHighFpsPhysicsFixEnabled() ? CTimer::GetTimeStepRatio30() : 1.0f;
+				ApplyTurnForce(contactPoints[CARWHEEL_REAR_LEFT], -0.001f*m_fTurnMass*m_fSteerAngle*burnoutScale*GetRight());
+#else
 				// BUG: missing timestep
 				ApplyTurnForce(contactPoints[CARWHEEL_REAR_LEFT], -0.001f*m_fTurnMass*m_fSteerAngle*GetRight());
+#endif
 			}else if(m_fTireTemperature > 1.0f){
 				rearTraction *= m_fTireTemperature;
 			}
@@ -1181,21 +1202,29 @@ CAutomobile::ProcessControl(void)
 		// Process rear wheels off ground
 
 		if(!IsRealHeli()){
+#ifdef MODERN_FEATURES
+			const bool bFixAirWheel = CModernConfig::IsHighFpsPhysicsFixEnabled();
+			const float airSpinRatio = bFixAirWheel ? CTimer::GetTimeStepRatio30() : 1.0f;
+			const float airSpinDecay = bFixAirWheel ? CTimer::PowTimeStep(0.95f) : 0.95f;
+#else
+			const float airSpinRatio = 1.0f;
+			const float airSpinDecay = 0.95f;
+#endif
 			if(m_aWheelTimer[CARWHEEL_REAR_LEFT] <= 0.0f){
 				if(bIsHandbrakeOn)
 					m_aWheelSpeed[CARWHEEL_REAR_LEFT] = 0.0f;
 				else if(mod_HandlingManager.HasRearWheelDrive(pHandling->nIdentifier) && acceleration != 0.0f){
 					if(acceleration > 0.0f){
 						if(m_aWheelSpeed[CARWHEEL_REAR_LEFT] < 2.0f)
-							m_aWheelSpeed[CARWHEEL_REAR_LEFT] -= 0.2f;
+							m_aWheelSpeed[CARWHEEL_REAR_LEFT] -= 0.2f * airSpinRatio;
 					}else{
 						if(m_aWheelSpeed[CARWHEEL_REAR_LEFT] > -2.0f)
-							m_aWheelSpeed[CARWHEEL_REAR_LEFT] += 0.1f;
+							m_aWheelSpeed[CARWHEEL_REAR_LEFT] += 0.1f * airSpinRatio;
 					}
 				}else{
-					m_aWheelSpeed[CARWHEEL_REAR_LEFT] *= 0.95f;
+					m_aWheelSpeed[CARWHEEL_REAR_LEFT] *= airSpinDecay;
 				}
-				m_aWheelRotation[CARWHEEL_REAR_LEFT] += m_aWheelSpeed[CARWHEEL_REAR_LEFT];
+				m_aWheelRotation[CARWHEEL_REAR_LEFT] += m_aWheelSpeed[CARWHEEL_REAR_LEFT] * airSpinRatio;
 			}
 			if(m_aWheelTimer[CARWHEEL_REAR_RIGHT] <= 0.0f){
 				if(bIsHandbrakeOn)
@@ -1203,15 +1232,15 @@ CAutomobile::ProcessControl(void)
 				else if(mod_HandlingManager.HasRearWheelDrive(pHandling->nIdentifier) && acceleration != 0.0f){
 					if(acceleration > 0.0f){
 						if(m_aWheelSpeed[CARWHEEL_REAR_RIGHT] < 2.0f)
-							m_aWheelSpeed[CARWHEEL_REAR_RIGHT] -= 0.2f;
+							m_aWheelSpeed[CARWHEEL_REAR_RIGHT] -= 0.2f * airSpinRatio;
 					}else{
 						if(m_aWheelSpeed[CARWHEEL_REAR_RIGHT] > -2.0f)
-							m_aWheelSpeed[CARWHEEL_REAR_RIGHT] += 0.1f;
+							m_aWheelSpeed[CARWHEEL_REAR_RIGHT] += 0.1f * airSpinRatio;
 					}
 				}else{
-					m_aWheelSpeed[CARWHEEL_REAR_RIGHT] *= 0.95f;
+					m_aWheelSpeed[CARWHEEL_REAR_RIGHT] *= airSpinDecay;
 				}
-				m_aWheelRotation[CARWHEEL_REAR_RIGHT] += m_aWheelSpeed[CARWHEEL_REAR_RIGHT];
+				m_aWheelRotation[CARWHEEL_REAR_RIGHT] += m_aWheelSpeed[CARWHEEL_REAR_RIGHT] * airSpinRatio;
 			}
 		}
 
@@ -1314,37 +1343,50 @@ CAutomobile::ProcessControl(void)
 		// Process front wheels off ground
 
 		if (!IsRealHeli()) {
+#ifdef MODERN_FEATURES
+			const bool bFixAirWheel = CModernConfig::IsHighFpsPhysicsFixEnabled();
+			const float airSpinRatio = bFixAirWheel ? CTimer::GetTimeStepRatio30() : 1.0f;
+			const float airSpinDecay = bFixAirWheel ? CTimer::PowTimeStep(0.95f) : 0.95f;
+#else
+			const float airSpinRatio = 1.0f;
+			const float airSpinDecay = 0.95f;
+#endif
 			if(m_aWheelTimer[CARWHEEL_FRONT_LEFT] <= 0.0f){
 				if(mod_HandlingManager.HasFrontWheelDrive(pHandling->nIdentifier) && acceleration != 0.0f){
 					if(acceleration > 0.0f){
 						if(m_aWheelSpeed[CARWHEEL_FRONT_LEFT] < 2.0f)
-							m_aWheelSpeed[CARWHEEL_FRONT_LEFT] -= 0.2f;
+							m_aWheelSpeed[CARWHEEL_FRONT_LEFT] -= 0.2f * airSpinRatio;
 					}else{
 						if(m_aWheelSpeed[CARWHEEL_FRONT_LEFT] > -2.0f)
-							m_aWheelSpeed[CARWHEEL_FRONT_LEFT] += 0.1f;
+							m_aWheelSpeed[CARWHEEL_FRONT_LEFT] += 0.1f * airSpinRatio;
 					}
 				}else{
-					m_aWheelSpeed[CARWHEEL_FRONT_LEFT] *= 0.95f;
+					m_aWheelSpeed[CARWHEEL_FRONT_LEFT] *= airSpinDecay;
 				}
-				m_aWheelRotation[CARWHEEL_FRONT_LEFT] += m_aWheelSpeed[CARWHEEL_FRONT_LEFT];
+				m_aWheelRotation[CARWHEEL_FRONT_LEFT] += m_aWheelSpeed[CARWHEEL_FRONT_LEFT] * airSpinRatio;
 			}
 			if(m_aWheelTimer[CARWHEEL_FRONT_RIGHT] <= 0.0f){
 				if(mod_HandlingManager.HasFrontWheelDrive(pHandling->nIdentifier) && acceleration != 0.0f){
 					if(acceleration > 0.0f){
 						if(m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] < 2.0f)
-							m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] -= 0.2f;
+							m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] -= 0.2f * airSpinRatio;
 					}else{
 						if(m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] > -2.0f)
-							m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] += 0.1f;
+							m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] += 0.1f * airSpinRatio;
 					}
 				}else{
-					m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] *= 0.95f;
+					m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] *= airSpinDecay;
 				}
-				m_aWheelRotation[CARWHEEL_FRONT_RIGHT] += m_aWheelSpeed[CARWHEEL_FRONT_RIGHT];
+				m_aWheelRotation[CARWHEEL_FRONT_RIGHT] += m_aWheelSpeed[CARWHEEL_FRONT_RIGHT] * airSpinRatio;
 			}
 		}
 		}
 
+#ifdef MODERN_FEATURES
+		const float wheelPosLerp = CModernConfig::IsHighFpsPhysicsFixEnabled() ? CTimer::ExpDecayFactor(0.75f) : 0.75f;
+#else
+		const float wheelPosLerp = 0.75f;
+#endif
 		for(i = 0; i < 4; i++){
 			float wheelPos = colModel->lines[i].p0.z;
 			if(m_aSuspensionSpringRatio[i] > 0.0f)
@@ -1352,7 +1394,7 @@ CAutomobile::ProcessControl(void)
 			if(GetModelIndex() == MI_VOODOO && bUsingSpecialColModel)
 				m_aWheelPosition[i] = wheelPos;
 			else
-				m_aWheelPosition[i] += (wheelPos - m_aWheelPosition[i])*0.75f;
+				m_aWheelPosition[i] += (wheelPos - m_aWheelPosition[i])*wheelPosLerp;
 		}
 		for(i = 0; i < 4; i++)
 			m_aWheelState[i] = WheelState[i];
@@ -1402,7 +1444,12 @@ CAutomobile::ProcessControl(void)
 		if(GetStatus() != STATUS_PLAYER && GetStatus() != STATUS_PLAYER_REMOTE && GetStatus() != STATUS_PHYSICS){
 			if(IsRealHeli()){
 				bEngineOn = false;
+#ifdef MODERN_FEATURES
+				float rotorStep = CModernConfig::IsHighFpsPhysicsFixEnabled() ? CTimer::GetTimeStepRatio30() : 1.0f;
+				m_aWheelSpeed[1] = Max(m_aWheelSpeed[1]-0.0005f*rotorStep, 0.0f);
+#else
 				m_aWheelSpeed[1] = Max(m_aWheelSpeed[1]-0.0005f, 0.0f);
+#endif
 				if(GetModelIndex() != MI_RCRAIDER && GetModelIndex() != MI_RCGOBLIN)
 					if(m_aWheelSpeed[1] < 0.154f && m_aWheelSpeed[1] > 0.0044f)
 						playRotorSound = true;
@@ -1423,10 +1470,15 @@ CAutomobile::ProcessControl(void)
 			{
 				// Speed up rotor
 				if (m_aWheelSpeed[1] < 0.22f && !bIsInWater) {
+#ifdef MODERN_FEATURES
+					float rotorStep = CModernConfig::IsHighFpsPhysicsFixEnabled() ? CTimer::GetTimeStepRatio30() : 1.0f;
+#else
+					float rotorStep = 1.0f;
+#endif
 					if (GetModelIndex() == MI_RCRAIDER || GetModelIndex() == MI_RCGOBLIN)
-						m_aWheelSpeed[1] += 0.003f;
+						m_aWheelSpeed[1] += 0.003f * rotorStep;
 					else
-						m_aWheelSpeed[1] += 0.001f;
+						m_aWheelSpeed[1] += 0.001f * rotorStep;
 				}
 
 				// Fly
@@ -1507,6 +1559,11 @@ CAutomobile::ProcessControl(void)
 				if(m_aWheelSpeed[1] < 0.154f && m_aWheelSpeed[1] > 0.0044f)
 					playRotorSound = true;
 		}
+#ifdef MODERN_FEATURES
+		else {
+			CModernVehiclePhysics::ProcessCarMidAirControl(this);
+		}
+#endif
 
 		// Play rotor sound
 		if(playRotorSound && m_aCarNodes[CAR_BONNET]){
@@ -1561,18 +1618,24 @@ CAutomobile::ProcessControl(void)
 
 	if(m_fHealth < 250.0f && GetStatus() != STATUS_WRECKED){
 		// Car is on fire
+#ifdef MODERN_FEATURES
+		const bool bEmitFireParticles = (CModernVehiclePhysics::ConsumeFireParticleTicks(this) > 0);
+#else
+		const bool bEmitFireParticles = true;
+#endif
+		if(bEmitFireParticles){
+			CParticle::AddParticle(PARTICLE_CARFLAME, damagePos,
+				CVector(0.0f, 0.0f, CGeneral::GetRandomNumberInRange(0.01125f, 0.09f)),
+				nil, 0.63f);
 
-		CParticle::AddParticle(PARTICLE_CARFLAME, damagePos,
-			CVector(0.0f, 0.0f, CGeneral::GetRandomNumberInRange(0.01125f, 0.09f)),
-			nil, 0.63f);
+			CVector coors = damagePos;
+			coors.x += CGeneral::GetRandomNumberInRange(-0.5625f, 0.5625f),
+			coors.y += CGeneral::GetRandomNumberInRange(-0.5625f, 0.5625f),
+			coors.z += CGeneral::GetRandomNumberInRange(0.5625f, 2.25f);
+			CParticle::AddParticle(PARTICLE_CARFLAME_SMOKE, coors, CVector(0.0f, 0.0f, 0.0f));
 
-		CVector coors = damagePos;
-		coors.x += CGeneral::GetRandomNumberInRange(-0.5625f, 0.5625f),
-		coors.y += CGeneral::GetRandomNumberInRange(-0.5625f, 0.5625f),
-		coors.z += CGeneral::GetRandomNumberInRange(0.5625f, 2.25f);
-		CParticle::AddParticle(PARTICLE_CARFLAME_SMOKE, coors, CVector(0.0f, 0.0f, 0.0f));
-
-		CParticle::AddParticle(PARTICLE_ENGINE_SMOKE2, damagePos, CVector(0.0f, 0.0f, 0.0f), nil, 0.5f);
+			CParticle::AddParticle(PARTICLE_ENGINE_SMOKE2, damagePos, CVector(0.0f, 0.0f, 0.0f), nil, 0.5f);
+		}
 
 		// Blow up car after 5 seconds
 		m_fFireBlowUpTimer += CTimer::GetTimeStepInMilliseconds();
@@ -1582,8 +1645,13 @@ CAutomobile::ProcessControl(void)
 		m_fFireBlowUpTimer = 0.0f;
 
 	// Decrease car health if engine is damaged badly
-	if(engineStatus > ENGINE_STATUS_ON_FIRE && m_fHealth > 250.0f)
+	if(engineStatus > ENGINE_STATUS_ON_FIRE && m_fHealth > 250.0f){
+#ifdef MODERN_FEATURES
+		m_fHealth -= CModernVehiclePhysics::ConsumeEngineDamageStep(this, 2.0f);
+#else
 		m_fHealth -= 2.0f;
+#endif
+	}
 
 	ProcessDelayedExplosion();
 
@@ -1766,21 +1834,28 @@ CAutomobile::PreRender(void)
 
 
 	// Wheel particles
+#ifdef MODERN_FEATURES
+	const bool bEmitWheelFx = (CModernVehiclePhysics::ConsumeWheelParticleTicks(this) > 0);
+#else
+	const bool bEmitWheelFx = true;
+#endif
 
 	if(GetModelIndex() == MI_DODO || GetVehicleAppearance() != VEHICLE_APPEARANCE_CAR){
 		; // nothing
 	}else if(GetModelIndex() == MI_RCBANDIT){
-		for(i = 0; i < 4; i++){
-			// Game has same code three times here
-			switch(m_aWheelState[i]){
-			case WHEEL_STATE_SPINNING:
-			case WHEEL_STATE_SKIDDING:
-			case WHEEL_STATE_FIXED:
-				CParticle::AddParticle(PARTICLE_RUBBER_SMOKE,
-					m_aWheelColPoints[i].point + CVector(0.0f, 0.0f, 0.05f),
-					CVector(0.0f, 0.0f, 0.0f), nil, 0.1f);
-				break;
-			default: break;
+		if(bEmitWheelFx){
+			for(i = 0; i < 4; i++){
+				// Game has same code three times here
+				switch(m_aWheelState[i]){
+				case WHEEL_STATE_SPINNING:
+				case WHEEL_STATE_SKIDDING:
+				case WHEEL_STATE_FIXED:
+					CParticle::AddParticle(PARTICLE_RUBBER_SMOKE,
+						m_aWheelColPoints[i].point + CVector(0.0f, 0.0f, 0.05f),
+						CVector(0.0f, 0.0f, 0.0f), nil, 0.1f);
+					break;
+				default: break;
+				}
 			}
 		}
 	}else{
@@ -1825,19 +1900,21 @@ CAutomobile::PreRender(void)
 				if(m_aSuspensionSpringRatioPrev[i] < 1.0f && m_aWheelColPoints[i].surfaceB != SURFACE_WATER)
 				switch(m_aWheelState[i]){
 				case WHEEL_STATE_SPINNING:
-					if(AddWheelDirtAndWater(&m_aWheelColPoints[i], drawParticles)){
-						CParticle::AddParticle(PARTICLE_BURNINGRUBBER_SMOKE,
+					if(bEmitWheelFx){
+						if(AddWheelDirtAndWater(&m_aWheelColPoints[i], drawParticles)){
+							CParticle::AddParticle(PARTICLE_BURNINGRUBBER_SMOKE,
+								m_aWheelColPoints[i].point + CVector(0.0f, 0.0f, 0.25f),
+								CVector(0.0f, 0.0f, 0.0f));
+
+							CParticle::AddParticle(PARTICLE_BURNINGRUBBER_SMOKE,
+								m_aWheelColPoints[i].point + CVector(0.0f, 0.0f, 0.25f),
+								CVector(0.0f, 0.0f, 0.05f));
+						}
+
+						CParticle::AddParticle(PARTICLE_RUBBER_SMOKE,
 							m_aWheelColPoints[i].point + CVector(0.0f, 0.0f, 0.25f),
 							CVector(0.0f, 0.0f, 0.0f));
-
-						CParticle::AddParticle(PARTICLE_BURNINGRUBBER_SMOKE,
-							m_aWheelColPoints[i].point + CVector(0.0f, 0.0f, 0.25f),
-							CVector(0.0f, 0.0f, 0.05f));
 					}
-
-					CParticle::AddParticle(PARTICLE_RUBBER_SMOKE,
-						m_aWheelColPoints[i].point + CVector(0.0f, 0.0f, 0.25f),
-						CVector(0.0f, 0.0f, 0.0f));
 
 					if(m_aWheelTimer[i] > 0.0f)
 						CSkidmarks::RegisterOne((uintptr)this + i, m_aWheelColPoints[i].point,
@@ -1849,7 +1926,7 @@ CAutomobile::PreRender(void)
 					if(i == CARWHEEL_REAR_LEFT || i == CARWHEEL_REAR_RIGHT || rearSkidding){
 						// same as below
 
-						if(Abs(fwdSpeed) > 5.0f){
+						if(bEmitWheelFx && Abs(fwdSpeed) > 5.0f){
 							AddWheelDirtAndWater(&m_aWheelColPoints[i], drawParticles);
 
 							CParticle::AddParticle(PARTICLE_RUBBER_SMOKE,
@@ -1865,7 +1942,7 @@ CAutomobile::PreRender(void)
 					break;
 
 				case WHEEL_STATE_FIXED:
-					if(Abs(fwdSpeed) > 5.0f){
+					if(bEmitWheelFx && Abs(fwdSpeed) > 5.0f){
 						AddWheelDirtAndWater(&m_aWheelColPoints[i], drawParticles);
 
 						CParticle::AddParticle(PARTICLE_RUBBER_SMOKE,
@@ -1880,7 +1957,7 @@ CAutomobile::PreRender(void)
 					break;
 
 				default:
-					if(Abs(fwdSpeed) > 5.0f)
+					if(bEmitWheelFx && Abs(fwdSpeed) > 5.0f)
 						AddWheelDirtAndWater(&m_aWheelColPoints[i], drawParticles);
 					if((m_aWheelSkidmarkBloody[i] || m_aWheelSkidmarkUnk[i]) && m_aWheelTimer[i] > 0.0f)
 						CSkidmarks::RegisterOne((uintptr)this + i, m_aWheelColPoints[i].point,
@@ -1889,7 +1966,7 @@ CAutomobile::PreRender(void)
 				}
 
 				// Sparks for friction of burst wheels
-				if(Damage.GetWheelStatus(i) == WHEEL_STATUS_BURST && m_aSuspensionSpringRatioPrev[i] < 1.0f){
+				if(bEmitWheelFx && Damage.GetWheelStatus(i) == WHEEL_STATUS_BURST && m_aSuspensionSpringRatioPrev[i] < 1.0f){
 					static float speedSq;
 					speedSq = m_vecMoveSpeed.MagnitudeSqr();
 					if(speedSq > SQR(0.1f) &&
@@ -1929,9 +2006,10 @@ CAutomobile::PreRender(void)
 		case WHEEL_STATE_SPINNING:
 		case WHEEL_STATE_SKIDDING:
 		case WHEEL_STATE_FIXED:
-			CParticle::AddParticle(PARTICLE_RUBBER_SMOKE,
-				m_aWheelColPoints[CARWHEEL_REAR_LEFT].point + CVector(0.0f, 0.0f, 0.25f) + offset,
-				CVector(0.0f, 0.0f, 0.0f));
+			if(bEmitWheelFx)
+				CParticle::AddParticle(PARTICLE_RUBBER_SMOKE,
+					m_aWheelColPoints[CARWHEEL_REAR_LEFT].point + CVector(0.0f, 0.0f, 0.25f) + offset,
+					CVector(0.0f, 0.0f, 0.0f));
 
 			if(m_aWheelTimer[CARWHEEL_REAR_LEFT] > 0.0f)
 				CSkidmarks::RegisterOne((uintptr)this + 5,
@@ -1947,9 +2025,10 @@ CAutomobile::PreRender(void)
 		case WHEEL_STATE_SPINNING:
 		case WHEEL_STATE_SKIDDING:
 		case WHEEL_STATE_FIXED:
-			CParticle::AddParticle(PARTICLE_RUBBER_SMOKE,
-				m_aWheelColPoints[CARWHEEL_REAR_RIGHT].point + CVector(0.0f, 0.0f, 0.25f) + offset,
-				CVector(0.0f, 0.0f, 0.0f));
+			if(bEmitWheelFx)
+				CParticle::AddParticle(PARTICLE_RUBBER_SMOKE,
+					m_aWheelColPoints[CARWHEEL_REAR_RIGHT].point + CVector(0.0f, 0.0f, 0.25f) + offset,
+					CVector(0.0f, 0.0f, 0.0f));
 
 			if(m_aWheelTimer[CARWHEEL_REAR_RIGHT] > 0.0f)
 				CSkidmarks::RegisterOne((uintptr)this + 6,
@@ -3111,6 +3190,12 @@ CAutomobile::ProcessControlInputs(uint8 pad)
 		bIsHandbrakeOn = true;
 
 	// Steer left/right
+#ifdef MODERN_FEATURES
+	// At 30 FPS, 0.2f * CTimer::GetTimeStep() == 0.2f * (50/30) == 1/3 per frame
+	const float steerRate = CModernConfig::IsHighFpsPhysicsFixEnabled() ? CTimer::ExpDecayFactor(1.0f / 3.0f) : (0.2f * CTimer::GetTimeStep());
+#else
+	const float steerRate = 0.2f * CTimer::GetTimeStep();
+#endif
 #ifdef GTA_PC_CONTROLS
 	if(CCamera::m_bUseMouse3rdPerson && !CVehicle::m_bDisableMouseSteering){
 		if(CPad::GetPad(pad)->GetMouseX() != 0.0f){
@@ -3120,15 +3205,13 @@ CAutomobile::ProcessControlInputs(uint8 pad)
 				m_fSteerInput *= Pow(fMouseCentreMult, CTimer::GetTimeStep());
 		}else if(CPad::GetPad(pad)->GetSteeringLeftRight() || nLastControlInput != 2){
 			// mouse hasn't move, steer with pad like below
-			m_fSteerInput += (-CPad::GetPad(pad)->GetSteeringLeftRight()/128.0f - m_fSteerInput)*
-				0.2f*CTimer::GetTimeStep();
+			m_fSteerInput += (-CPad::GetPad(pad)->GetSteeringLeftRight()/128.0f - m_fSteerInput)*steerRate;
 			nLastControlInput = 0;
 		}
 	}else
 #endif
 	{
-		m_fSteerInput += (-CPad::GetPad(pad)->GetSteeringLeftRight()/128.0f - m_fSteerInput)*
-			0.2f*CTimer::GetTimeStep();
+		m_fSteerInput += (-CPad::GetPad(pad)->GetSteeringLeftRight()/128.0f - m_fSteerInput)*steerRate;
 		nLastControlInput = 0;
 	}
 	m_fSteerInput = Clamp(m_fSteerInput, -1.0f, 1.0f);

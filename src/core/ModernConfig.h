@@ -110,6 +110,11 @@ public:
 	static bool ShouldFrameLimitGameplay();
 	static bool ShouldWaitVSyncInGameplay();
 	static void ApplyFrameRateSettings();
+
+	// Phase 1 (M1.1 / M1.2) runtime feature predicates
+	static bool IsHighFpsPhysicsFixEnabled() { return m_bMasterEnable != 0 && m_bHighFpsPhysicsFix != 0; }
+	static bool IsModernDrivingEnabled() { return m_bMasterEnable != 0 && m_nDrivingStyle == MODERN_DRIVING_MODERN; }
+	static bool IsMidAirControlEnabled() { return m_bMasterEnable != 0 && m_bMidAirControl != 0; }
 };
 
 #endif // MODERN_FEATURES

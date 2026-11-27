@@ -37,6 +37,10 @@
 #include "Bike.h"
 #include "Debug.h"
 #include "SaveBuf.h"
+#ifdef MODERN_FEATURES
+#include "ModernConfig.h"
+#include "ModernVehiclePhysics.h"
+#endif
 
 const uint32 CBike::nSaveStructSize =
 #ifdef COMPATIBLE_SAVES
@@ -760,6 +764,10 @@ CBike::ProcessControl(void)
 				m_vecAvgSurfaceNormal *= -1.0f;
 		}
 
+#ifdef MODERN_FEATURES
+		CModernVehiclePhysics::UpdateBikePreWheel(this, m_nWheelsOnGround);
+#endif
+
 		// Find contact points for wheel processing
 		int frontLine = m_aSuspensionSpringRatio[BIKESUSP_F1] < m_aSuspensionSpringRatio[BIKESUSP_F2] ?
 			BIKESUSP_F1 : BIKESUSP_F2;
@@ -862,8 +870,16 @@ CBike::ProcessControl(void)
 					WheelState[BIKEWHEEL_FRONT] = WHEEL_STATE_NORMAL;
 			}else{
 				// Wheel in the air
+#ifdef MODERN_FEATURES
+				const bool bFixAirWheel = CModernConfig::IsHighFpsPhysicsFixEnabled();
+				const float airSpinRatio = bFixAirWheel ? CTimer::GetTimeStepRatio30() : 1.0f;
+				const float airSpinDecay = bFixAirWheel ? CTimer::PowTimeStep(0.95f) : 0.95f;
+				m_aWheelSpeed[BIKEWHEEL_FRONT] *= airSpinDecay;
+				m_aWheelRotation[BIKEWHEEL_FRONT] += m_aWheelSpeed[BIKEWHEEL_FRONT] * airSpinRatio;
+#else
 				m_aWheelSpeed[BIKEWHEEL_FRONT] *= 0.95f;
 				m_aWheelRotation[BIKEWHEEL_FRONT] += m_aWheelSpeed[BIKEWHEEL_FRONT];
+#endif
 			}
 		}
 
@@ -934,18 +950,23 @@ CBike::ProcessControl(void)
 				WheelState[BIKEWHEEL_REAR] = WHEEL_STATE_NORMAL;
 		}else{
 			// Wheel in the air
+#ifdef MODERN_FEATURES
+			const float airSpinRatio = CModernConfig::IsHighFpsPhysicsFixEnabled() ? CTimer::GetTimeStepRatio30() : 1.0f;
+#else
+			const float airSpinRatio = 1.0f;
+#endif
 			if(bIsHandbrakeOn)
 				m_aWheelSpeed[BIKEWHEEL_REAR] = 0.0f;
 			else{
 				if(acceleration > 0.0f){
 					if(m_aWheelSpeed[BIKEWHEEL_REAR] < 2.0f)
-						m_aWheelSpeed[BIKEWHEEL_REAR] -= 0.2f;
+						m_aWheelSpeed[BIKEWHEEL_REAR] -= 0.2f * airSpinRatio;
 				}else{
 					if(m_aWheelSpeed[BIKEWHEEL_REAR] > -2.0f)
-						m_aWheelSpeed[BIKEWHEEL_REAR] += 0.1f;
+						m_aWheelSpeed[BIKEWHEEL_REAR] += 0.1f * airSpinRatio;
 				}
 			}
-			m_aWheelRotation[BIKEWHEEL_REAR] += m_aWheelSpeed[BIKEWHEEL_REAR];
+			m_aWheelRotation[BIKEWHEEL_REAR] += m_aWheelSpeed[BIKEWHEEL_REAR] * airSpinRatio;
 		}
 
 		if(m_doingBurnout && m_aWheelState[BIKEWHEEL_REAR] == WHEEL_STATE_SPINNING){
@@ -1006,8 +1027,16 @@ CBike::ProcessControl(void)
 					WheelState[BIKEWHEEL_FRONT] = WHEEL_STATE_NORMAL;
 			}else{
 				// Wheel in the air
+#ifdef MODERN_FEATURES
+				const bool bFixAirWheel = CModernConfig::IsHighFpsPhysicsFixEnabled();
+				const float airSpinRatio = bFixAirWheel ? CTimer::GetTimeStepRatio30() : 1.0f;
+				const float airSpinDecay = bFixAirWheel ? CTimer::PowTimeStep(0.95f) : 0.95f;
+				m_aWheelSpeed[BIKEWHEEL_FRONT] *= airSpinDecay;
+				m_aWheelRotation[BIKEWHEEL_FRONT] += m_aWheelSpeed[BIKEWHEEL_FRONT] * airSpinRatio;
+#else
 				m_aWheelSpeed[BIKEWHEEL_FRONT] *= 0.95f;
 				m_aWheelRotation[BIKEWHEEL_FRONT] += m_aWheelSpeed[BIKEWHEEL_FRONT];
+#endif
 			}
 		}
 
@@ -1063,15 +1092,20 @@ CBike::ProcessControl(void)
 			m_fBrakeDestabilization = 0.0f;
 
 		// Update wheel positions from suspension
+#ifdef MODERN_FEATURES
+		const float bikeWheelPosLerp = CModernConfig::IsHighFpsPhysicsFixEnabled() ? CTimer::ExpDecayFactor(0.75f) : 0.75f;
+#else
+		const float bikeWheelPosLerp = 0.75f;
+#endif
 		float frontWheelPos = colModel->lines[frontLine].p0.z;
 		if(m_aSuspensionSpringRatio[frontLine] > 0.0f)
 			frontWheelPos -= m_aSuspensionSpringRatio[frontLine]*m_aSuspensionSpringLength[frontLine];
-		m_aWheelPosition[BIKEWHEEL_FRONT] += (frontWheelPos - m_aWheelPosition[BIKEWHEEL_FRONT])*0.75f;
+		m_aWheelPosition[BIKEWHEEL_FRONT] += (frontWheelPos - m_aWheelPosition[BIKEWHEEL_FRONT])*bikeWheelPosLerp;
 
 		float rearWheelPos = colModel->lines[rearLine].p0.z;
 		if(m_aSuspensionSpringRatio[rearLine] > 0.0f)
 			rearWheelPos -= m_aSuspensionSpringRatio[rearLine]*m_aSuspensionSpringLength[rearLine];
-		m_aWheelPosition[BIKEWHEEL_REAR] += (rearWheelPos - m_aWheelPosition[BIKEWHEEL_REAR])*0.75f;
+		m_aWheelPosition[BIKEWHEEL_REAR] += (rearWheelPos - m_aWheelPosition[BIKEWHEEL_REAR])*bikeWheelPosLerp;
 
 		for(i = 0; i < 2; i++)
 			m_aWheelState[i] = WheelState[i];
@@ -1103,29 +1137,36 @@ CBike::ProcessControl(void)
 		// Car is on fire
 
 		CVector damagePos, fireDir;
+#ifdef MODERN_FEATURES
+		const bool bEmitFireParticles = (CModernVehiclePhysics::ConsumeFireParticleTicks(this) > 0);
+#else
+		const bool bEmitFireParticles = true;
+#endif
 
 		// move fire forward if in first person
-		if(this == FindPlayerVehicle() && TheCamera.GetLookingForwardFirstPerson()){
-			damagePos = CVector(0.0f, 1.2f, -0.4f);
-			fireDir = CVector(0.0f, 0.0f, CGeneral::GetRandomNumberInRange(0.01125f, 0.09f));
-		}else{
-			damagePos = ((CVehicleModelInfo*)CModelInfo::GetModelInfo(GetModelIndex()))->m_positions[CAR_POS_BACKSEAT];
-			damagePos.z -= 0.3f;
-			fireDir = CGeneral::GetRandomNumberInRange(0.02025f, 0.09f) * GetRight();
-			fireDir -= CGeneral::GetRandomNumberInRange(0.02025f, 0.18f) * GetForward();
-			fireDir.z = CGeneral::GetRandomNumberInRange(0.00225f, 0.018f);
+		if(bEmitFireParticles){
+			if(this == FindPlayerVehicle() && TheCamera.GetLookingForwardFirstPerson()){
+				damagePos = CVector(0.0f, 1.2f, -0.4f);
+				fireDir = CVector(0.0f, 0.0f, CGeneral::GetRandomNumberInRange(0.01125f, 0.09f));
+			}else{
+				damagePos = ((CVehicleModelInfo*)CModelInfo::GetModelInfo(GetModelIndex()))->m_positions[CAR_POS_BACKSEAT];
+				damagePos.z -= 0.3f;
+				fireDir = CGeneral::GetRandomNumberInRange(0.02025f, 0.09f) * GetRight();
+				fireDir -= CGeneral::GetRandomNumberInRange(0.02025f, 0.18f) * GetForward();
+				fireDir.z = CGeneral::GetRandomNumberInRange(0.00225f, 0.018f);
+			}
+
+			damagePos = GetMatrix()*damagePos;
+			CParticle::AddParticle(PARTICLE_CARFLAME, damagePos, fireDir,
+				nil, 0.9f);
+
+			CParticle::AddParticle(PARTICLE_ENGINE_SMOKE2, damagePos, CVector(0.0f, 0.0f, 0.0f), nil, 0.5f);
+
+			damagePos.x += CGeneral::GetRandomNumberInRange(-0.5625f, 0.5625f),
+			damagePos.y += CGeneral::GetRandomNumberInRange(-0.5625f, 0.5625f),
+			damagePos.z += CGeneral::GetRandomNumberInRange(0.5625f, 2.25f);
+			CParticle::AddParticle(PARTICLE_CARFLAME_SMOKE, damagePos, CVector(0.0f, 0.0f, 0.0f));
 		}
-
-		damagePos = GetMatrix()*damagePos;
-		CParticle::AddParticle(PARTICLE_CARFLAME, damagePos, fireDir,
-			nil, 0.9f);
-
-		CParticle::AddParticle(PARTICLE_ENGINE_SMOKE2, damagePos, CVector(0.0f, 0.0f, 0.0f), nil, 0.5f);
-
-		damagePos.x += CGeneral::GetRandomNumberInRange(-0.5625f, 0.5625f),
-		damagePos.y += CGeneral::GetRandomNumberInRange(-0.5625f, 0.5625f),
-		damagePos.z += CGeneral::GetRandomNumberInRange(0.5625f, 2.25f);
-		CParticle::AddParticle(PARTICLE_CARFLAME_SMOKE, damagePos, CVector(0.0f, 0.0f, 0.0f));
 
 		// Blow up car after 5 seconds
 		m_fFireBlowUpTimer += CTimer::GetTimeStepInMilliseconds();
@@ -1259,6 +1300,9 @@ CBike::ProcessControl(void)
 				ApplyTurnForce(0.5f*CTimer::GetTimeStep()*stoppieStab*m_fTurnMass*GetUp(), worldCOM+GetForward());
 				ApplyTurnForce(0.5f*Min(5.0f*speed,1.0f)*CTimer::GetTimeStep()*m_fWheelAngle*pBikeHandling->fWheelieSteer*m_fTurnMass*GetRight(), worldCOM+GetForward());
 			}
+#ifdef MODERN_FEATURES
+			CModernVehiclePhysics::ProcessBikeMidAirControl(this);
+#endif
 		}
 	}
 }
@@ -1287,6 +1331,11 @@ CBike::PreRender(void)
 	CVehicleModelInfo *mi = (CVehicleModelInfo*)CModelInfo::GetModelInfo(GetModelIndex());
 
 	// Wheel particles
+#ifdef MODERN_FEATURES
+	const bool bEmitBikeWheelFx = (CModernVehiclePhysics::ConsumeWheelParticleTicks(this) > 0);
+#else
+	const bool bEmitBikeWheelFx = true;
+#endif
 
 	if(m_aWheelState[BIKEWHEEL_REAR] != WHEEL_STATE_NORMAL &&
 	   m_aWheelColPoints[BIKESUSP_R2].surfaceB != SURFACE_WATER && m_aWheelTimer[BIKESUSP_R2] > 0.0f){
@@ -1295,14 +1344,15 @@ CBike::PreRender(void)
 		if(m_aSuspensionSpringRatioPrev[BIKESUSP_R1] < 1.0f)
 			groundPos = (groundPos + m_aWheelColPoints[BIKESUSP_R1].point)/2.0f;
 		groundPos += Sin(m_fLeanLRAngle) * 0.8f*GetColModel()->boundingBox.min.z * GetRight();
-		CParticle::AddParticle(PARTICLE_RUBBER_SMOKE,
-			groundPos + CVector(0.0f, 0.0f, 0.25f), CVector(0.0f, 0.0f, 0.0f),
-			nil, smokeSize);
+		if(bEmitBikeWheelFx)
+			CParticle::AddParticle(PARTICLE_RUBBER_SMOKE,
+				groundPos + CVector(0.0f, 0.0f, 0.25f), CVector(0.0f, 0.0f, 0.0f),
+				nil, smokeSize);
 
 		CSkidmarks::RegisterOne((uintptr)this, groundPos, GetForward().x, GetForward().y,
 			m_aWheelSkidmarkType[BIKEWHEEL_REAR], &m_aWheelSkidmarkBloody[BIKEWHEEL_REAR]);
 
-		if(m_aWheelState[BIKEWHEEL_REAR] == WHEEL_STATE_SPINNING &&
+		if(bEmitBikeWheelFx && m_aWheelState[BIKEWHEEL_REAR] == WHEEL_STATE_SPINNING &&
 		   (CSurfaceTable::GetAdhesionGroup(m_aWheelColPoints[BIKESUSP_R2].surfaceB) == ADHESIVE_HARD ||
 		    CSurfaceTable::GetAdhesionGroup(m_aWheelColPoints[BIKESUSP_R2].surfaceB) == ADHESIVE_ROAD)){
 			CParticle::AddParticle(PARTICLE_BURNINGRUBBER_SMOKE,
@@ -1526,36 +1576,38 @@ CBike::PreRender(void)
 	float fwdSpeed = DotProduct(m_vecMoveSpeed, GetForward())*180.0f;
 	int drawParticles = Abs(fwdSpeed) < 90.0f;
 	int susp = BIKESUSP_F1;
-	for(i = 0; i < 2; i++){
-		if(i == BIKEWHEEL_REAR)
-			susp = BIKESUSP_R1;
+	if(bEmitBikeWheelFx){
+		for(i = 0; i < 2; i++){
+			if(i == BIKEWHEEL_REAR)
+				susp = BIKESUSP_R1;
 
-		static float speedSq;
-		// Sparks for friction of burst wheels
-		if(m_wheelStatus[i] == WHEEL_STATUS_BURST && m_aSuspensionSpringRatioPrev[susp] < 1.0f &&
-		   (speedSq = m_vecMoveSpeed.MagnitudeSqr(), speedSq > SQR(0.1f)) &&
-		   m_aWheelColPoints[susp].surfaceB != SURFACE_GRASS &&
-		   m_aWheelColPoints[susp].surfaceB != SURFACE_MUD_DRY &&
-		   m_aWheelColPoints[susp].surfaceB != SURFACE_SAND &&
-		   m_aWheelColPoints[susp].surfaceB != SURFACE_SAND_BEACH){
-			CVector normalSpeed = m_aWheelColPoints[susp].normal * DotProduct(m_aWheelColPoints[susp].normal, m_vecMoveSpeed);
-			CVector frictionSpeed = m_vecMoveSpeed - normalSpeed;
-			CVector sparkDir = 0.25f*frictionSpeed;
-			CParticle::AddParticle(PARTICLE_SPARK_SMALL, m_aWheelColPoints[susp].point, sparkDir);
+			static float speedSq;
+			// Sparks for friction of burst wheels
+			if(m_wheelStatus[i] == WHEEL_STATUS_BURST && m_aSuspensionSpringRatioPrev[susp] < 1.0f &&
+			   (speedSq = m_vecMoveSpeed.MagnitudeSqr(), speedSq > SQR(0.1f)) &&
+			   m_aWheelColPoints[susp].surfaceB != SURFACE_GRASS &&
+			   m_aWheelColPoints[susp].surfaceB != SURFACE_MUD_DRY &&
+			   m_aWheelColPoints[susp].surfaceB != SURFACE_SAND &&
+			   m_aWheelColPoints[susp].surfaceB != SURFACE_SAND_BEACH){
+				CVector normalSpeed = m_aWheelColPoints[susp].normal * DotProduct(m_aWheelColPoints[susp].normal, m_vecMoveSpeed);
+				CVector frictionSpeed = m_vecMoveSpeed - normalSpeed;
+				CVector sparkDir = 0.25f*frictionSpeed;
+				CParticle::AddParticle(PARTICLE_SPARK_SMALL, m_aWheelColPoints[susp].point, sparkDir);
 
-			if(speedSq > 0.04f)
-				CParticle::AddParticle(PARTICLE_SPARK_SMALL, m_aWheelColPoints[susp].point, sparkDir);
-			if(speedSq > 0.16f){
-				CParticle::AddParticle(PARTICLE_SPARK_SMALL, m_aWheelColPoints[susp].point, sparkDir);
-				CParticle::AddParticle(PARTICLE_SPARK_SMALL, m_aWheelColPoints[susp].point, sparkDir);
+				if(speedSq > 0.04f)
+					CParticle::AddParticle(PARTICLE_SPARK_SMALL, m_aWheelColPoints[susp].point, sparkDir);
+				if(speedSq > 0.16f){
+					CParticle::AddParticle(PARTICLE_SPARK_SMALL, m_aWheelColPoints[susp].point, sparkDir);
+					CParticle::AddParticle(PARTICLE_SPARK_SMALL, m_aWheelColPoints[susp].point, sparkDir);
+				}
+			}else if(m_aSuspensionSpringRatioPrev[i] < 1.0f &&
+			         (fwdSpeed > 0.2f || m_aWheelState[i] == WHEEL_STATE_SPINNING)){
+				if(m_aWheelColPoints[susp].surfaceB == SURFACE_GRASS ||
+				   m_aWheelColPoints[susp].surfaceB == SURFACE_MUD_DRY ||
+				   m_aWheelColPoints[susp].surfaceB == SURFACE_SAND ||
+				   m_aWheelColPoints[susp].surfaceB == SURFACE_SAND_BEACH)
+					AddWheelDirtAndWater(&m_aWheelColPoints[susp], drawParticles);
 			}
-		}else if(m_aSuspensionSpringRatioPrev[i] < 1.0f &&
-		         (fwdSpeed > 0.2f || m_aWheelState[i] == WHEEL_STATE_SPINNING)){
-			if(m_aWheelColPoints[susp].surfaceB == SURFACE_GRASS ||
-			   m_aWheelColPoints[susp].surfaceB == SURFACE_MUD_DRY ||
-			   m_aWheelColPoints[susp].surfaceB == SURFACE_SAND ||
-			   m_aWheelColPoints[susp].surfaceB == SURFACE_SAND_BEACH)
-				AddWheelDirtAndWater(&m_aWheelColPoints[susp], drawParticles);
 		}
 	}
 
@@ -1820,6 +1872,12 @@ CBike::ProcessControlInputs(uint8 pad)
 		bIsHandbrakeOn = !!CPad::GetPad(pad)->GetHandBrake();
 
 	// Steer left/right
+#ifdef MODERN_FEATURES
+	// At 30 FPS, 0.2f * CTimer::GetTimeStep() == 1/3 per frame
+	const float bikeInputRate = CModernConfig::IsHighFpsPhysicsFixEnabled() ? CTimer::ExpDecayFactor(1.0f / 3.0f) : (0.2f * CTimer::GetTimeStep());
+#else
+	const float bikeInputRate = 0.2f * CTimer::GetTimeStep();
+#endif
 #ifdef FIX_BUGS
 	if(CCamera::m_bUseMouse3rdPerson && !CVehicle::m_bDisableMouseSteering){
 		if(CPad::GetPad(pad)->GetMouseX() != 0.0f){
@@ -1829,15 +1887,13 @@ CBike::ProcessControlInputs(uint8 pad)
 				m_fSteerInput *= Pow(fMouseCentreMult, CTimer::GetTimeStep());
 		}else if(CPad::GetPad(pad)->GetSteeringLeftRight() || nLastControlInput != 2){
 			// mouse hasn't move, steer with pad like below
-			m_fSteerInput += (-CPad::GetPad(pad)->GetSteeringLeftRight()/128.0f - m_fSteerInput)*
-				0.2f*CTimer::GetTimeStep();
+			m_fSteerInput += (-CPad::GetPad(pad)->GetSteeringLeftRight()/128.0f - m_fSteerInput)*bikeInputRate;
 			nLastControlInput = 0;
 		}
 	}else
 #endif
 	{
-		m_fSteerInput += (-CPad::GetPad(pad)->GetSteeringLeftRight()/128.0f - m_fSteerInput)*
-			0.2f*CTimer::GetTimeStep();
+		m_fSteerInput += (-CPad::GetPad(pad)->GetSteeringLeftRight()/128.0f - m_fSteerInput)*bikeInputRate;
 		nLastControlInput = 0;
 	}
 	m_fSteerInput = Clamp(m_fSteerInput, -1.0f, 1.0f);
@@ -1849,7 +1905,7 @@ CBike::ProcessControlInputs(uint8 pad)
 	else
 #endif
 	updown = -CPad::GetPad(pad)->GetSteeringUpDown()/128.0f + CPad::GetPad(pad)->GetCarGunUpDown()/128.0f;
-	m_fLeanInput += (updown - m_fLeanInput)*0.2f*CTimer::GetTimeStep();
+	m_fLeanInput += (updown - m_fLeanInput)*bikeInputRate;
 	m_fLeanInput = Clamp(m_fLeanInput, -1.0f, 1.0f);
 
 	// Accelerate/Brake

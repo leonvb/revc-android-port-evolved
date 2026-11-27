@@ -3,6 +3,9 @@
 #include "Timer.h"
 #include "HandlingMgr.h"
 #include "Transmission.h"
+#ifdef MODERN_FEATURES
+#include "ModernConfig.h"
+#endif
 
 void
 cTransmission::InitGearRatios(void)
@@ -77,15 +80,25 @@ cTransmission::CalculateDriveAcceleration(const float &gasPedal, uint8 &gear, fl
 	assert(gear <= nNumberOfGears);
 
 	pGearRatio = &Gears[gear];
+#ifdef MODERN_FEATURES
+	const bool bModernDrive = CModernConfig::IsModernDrivingEnabled();
+	if(bModernDrive && time > 0.0f){
+		time = Max(0.0f, time - CTimer::GetTimeStepInSeconds());
+	}
+#endif
 	if(fVelocity > pGearRatio->fShiftUpVelocity){
 		if(gear != 0 || gasPedal > 0.0f){
 			gear++;
-			return CalculateDriveAcceleration(gasPedal, gear, time, fVelocity, false);
+#ifdef MODERN_FEATURES
+			if(bModernDrive && gear > 1)
+				time = 0.09f; // brief 90 ms clutch torque dip on upshifts
+#endif
+			return CalculateDriveAcceleration(gasPedal, gear, time, fVelocity, cheat);
 		}
 	}else if(fVelocity < pGearRatio->fShiftDownVelocity && gear != 0){
 		if(gear != 1 || gasPedal < 0.0f){
 			gear--;
-			return CalculateDriveAcceleration(gasPedal, gear, time, fVelocity, false);
+			return CalculateDriveAcceleration(gasPedal, gear, time, fVelocity, cheat);
 		}
 	}
 
@@ -99,8 +112,21 @@ cTransmission::CalculateDriveAcceleration(const float &gasPedal, uint8 &gear, fl
 		accelMul = 1.0f;
 		speedMul = 1.0f;
 	}else{
+#ifdef MODERN_FEATURES
+		// Classic VC used integer division `(gear-1)/(nNumberOfGears-1)` (making gears 1..N-1 identical and top gear abruptly weaker).
+		// Modern Driving uses a smooth floating-point gear progression blended so top-end cruise speed stays faithful to handling.cfg.
+		float f;
+		if(bModernDrive){
+			float floatF = 1.0f - (float)(gear - 1) / (float)(nNumberOfGears - 1);
+			float classicF = 1.0f - (gear - 1) / (nNumberOfGears - 1);
+			f = lerp(0.55f, classicF, floatF);
+		}else{
+			f = 1.0f - (gear-1)/(nNumberOfGears-1);
+		}
+#else
 		// BUG or not? this is 1.0 normally but 0.0 in the highest gear
 		float f = 1.0f - (gear-1)/(nNumberOfGears-1);
+#endif
 		speedMul = 3.0f*sq(f) + 1.0f;
 		// This is pretty ugly, could be written more clearly
 		if(Flags & HANDLING_2G_BOOST){
@@ -122,6 +148,18 @@ cTransmission::CalculateDriveAcceleration(const float &gasPedal, uint8 &gear, fl
 		fCheat = 1.0f;
 	float targetVelocity = Gears[gear].fMaxVelocity*speedMul*fCheat;
 	float accel = (targetVelocity - fVelocity) * (fEngineAcceleration*accelMul) / Abs(targetVelocity);
+#ifdef MODERN_FEATURES
+	if(bModernDrive && gear >= 1){
+		// Bell-shaped torque band peaking in the upper-mid range of the current gear
+		float gearMin = (gear == 1) ? 0.0f : Gears[gear].fShiftDownVelocity;
+		float gearSpan = Max(Gears[gear].fMaxVelocity - gearMin, 0.02f);
+		float rpmNorm = Clamp((fVelocity - gearMin) / gearSpan, 0.0f, 1.0f);
+		float torqueCurve = 0.90f + 0.16f * Sin(rpmNorm * PI);
+		accel *= torqueCurve;
+		if(time > 0.0f)
+			accel *= 0.35f; // crisp upshift torque dip
+	}
+#endif
 	if(Abs(fVelocity) < Abs(Gears[gear].fMaxVelocity*fCheat))
 		fAcceleration = gasPedal * accel * CTimer::GetTimeStep();
 	else

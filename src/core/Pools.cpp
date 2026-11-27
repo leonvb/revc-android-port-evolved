@@ -16,6 +16,9 @@
 #include "World.h"
 #include "MemoryHeap.h"
 #include "SaveBuf.h"
+#ifdef MODERN_FEATURES
+#include "ModernVehiclePhysics.h"
+#endif
 
 CCPtrNodePool *CPools::ms_pPtrNodePool;
 CEntryInfoNodePool *CPools::ms_pEntryInfoNodePool;
@@ -60,6 +63,9 @@ CPools::Initialise(void)
 	CHECKMEM("after cAudioScriptObjectPool");
 	ms_pColModelPool = new CColModelPool(NUMCOLMODELS, "ColModel");
 	CHECKMEM("after pools");
+#ifdef MODERN_FEATURES
+	CModernVehiclePhysics::ResetAll();
+#endif
 	POP_MEMID();
 }
 
@@ -88,6 +94,9 @@ CPools::ShutDown(void)
 	delete ms_pDummyPool;
 	delete ms_pAudioScriptObjectPool;
 	delete ms_pColModelPool;
+#ifdef MODERN_FEATURES
+	CModernVehiclePhysics::ResetAll();
+#endif
 
 	printf("Shutdown pool done\n");
 }
@@ -138,6 +147,9 @@ CPools::MakeSureSlotInObjectPoolIsEmpty(int32 slot)
 
 void CPools::LoadVehiclePool(uint8* buf, uint32 size)
 {
+#ifdef MODERN_FEATURES
+	CModernVehiclePhysics::ResetAll();
+#endif
 INITSAVEBUF
 	int nNumCars, nNumBoats, nNumBikes;
 	ReadSaveBuf(&nNumCars, buf);
