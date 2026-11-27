@@ -13,6 +13,10 @@
 #include "Renderer.h"
 #include "World.h"
 #include "custompipes.h"
+#ifdef MODERN_FEATURES
+#include "ModernConfig.h"
+#include "ModernLighting.h"
+#endif
 
 #ifdef EXTENDED_PIPELINES
 
@@ -188,6 +192,10 @@ DestroyVehiclePipe(void)
 
 static void *neoWorld_VS;
 static void *neoWorldVC_PS;
+#ifdef MODERN_FEATURES
+static void *modernWorld_VS, *modernWorld_PS;
+static bool modernRenderingRoad;
+#endif
 
 static void
 worldRenderCB(rw::Atomic *atomic, rw::d3d9::InstanceDataHeader *header)
@@ -196,7 +204,15 @@ worldRenderCB(rw::Atomic *atomic, rw::d3d9::InstanceDataHeader *header)
 	using namespace rw::d3d;
 	using namespace rw::d3d9;
 
-	if(!LightmapEnable){
+#ifdef MODERN_FEATURES
+	bool useModern = modernWorld_VS && modernWorld_PS && CModernConfig::m_bMasterEnable &&
+	                 (atomic->geometry->flags & Geometry::NORMALS) && !bRenderingEnvMap &&
+	                 (CModernConfig::m_bDynamicPointLights ||
+	                  (modernRenderingRoad && CModernConfig::m_bWetRoadReflections && CWeather::WetRoads > 0.0f));
+#else
+	const bool useModern = false;
+#endif
+	if(!LightmapEnable && !useModern){
 		defaultRenderCB_Shader(atomic, header);
 		return;
 	}
@@ -208,7 +224,27 @@ worldRenderCB(rw::Atomic *atomic, rw::d3d9::InstanceDataHeader *header)
 
 	vsBits = lightingCB_Shader(atomic);
 	uploadMatrices(atomic->getFrame()->getLTM());
-
+#ifdef MODERN_FEATURES
+	if(useModern){
+		ModernLightUniforms lights;
+		BuildModernLights(atomic, CModernConfig::m_bDynamicPointLights != 0, lights);
+		d3ddevice->SetPixelShaderConstantF(10, &lights.position[0][0], ModernLightingPolicy::MaxLights);
+		d3ddevice->SetPixelShaderConstantF(18, &lights.color[0][0], ModernLightingPolicy::MaxLights);
+		d3ddevice->SetPixelShaderConstantF(26, &lights.direction[0][0], ModernLightingPolicy::MaxLights);
+		bool envAvailable = EnvMapTex && EnvMapHasFrame && VehiclePipeSwitch == VEHICLEPIPE_NEO;
+		float options[4] = { modernRenderingRoad && CModernConfig::m_bWetRoadReflections ?
+		                     Min(Max(CWeather::WetRoads, 0.0f), 1.0f) : 0.0f,
+		                     envAvailable ? 1.0f : 0.0f, 0.0f, 0.0f };
+		float sky[4] = { CTimeCycle::GetSkyBottomRed()/255.0f, CTimeCycle::GetSkyBottomGreen()/255.0f,
+		                 CTimeCycle::GetSkyBottomBlue()/255.0f, 0.0f };
+		V3d eye = rw::engine->currentCamera->getFrame()->getLTM()->pos;
+		float eyeData[4] = { eye.x, eye.y, eye.z, 0.0f };
+		d3ddevice->SetPixelShaderConstantF(34, options, 1);
+		d3ddevice->SetPixelShaderConstantF(35, sky, 1);
+		d3ddevice->SetPixelShaderConstantF(36, eyeData, 1);
+		d3d::setTexture(2, envAvailable ? EnvMapTex : nil);
+	}
+#endif
 
 	float lightfactor[4];
 
@@ -216,7 +252,7 @@ worldRenderCB(rw::Atomic *atomic, rw::d3d9::InstanceDataHeader *header)
 	for(rw::uint32 i = 0; i < header->numMeshes; i++){
 		Material *m = inst->material;
 
-		if(MatFX::getEffects(m) == MatFX::DUAL){
+		if(LightmapEnable && MatFX::getEffects(m) == MatFX::DUAL){
 			setVertexShader(neoWorld_VS);
 
 			MatFX *matfx = MatFX::get(m);
@@ -232,25 +268,38 @@ worldRenderCB(rw::Atomic *atomic, rw::d3d9::InstanceDataHeader *header)
 			d3d::setTexture(1, nil);
 			lightfactor[0] = lightfactor[1] = lightfactor[2] = 0.0f;
 		}
-		lightfactor[3] = m->color.alpha/255.0f;
+#ifdef MODERN_FEATURES
+		if(useModern) setVertexShader(modernWorld_VS);
+#endif
+		lightfactor[3] = useModern && !LightmapEnable ? 1.0f : m->color.alpha/255.0f;
 		d3d::setTexture(0, m->texture);
 		d3ddevice->SetPixelShaderConstantF(1, lightfactor, 1);
 
 		SetRenderState(VERTEXALPHA, inst->vertexAlpha || m->color.alpha != 255);
 
 		RGBA color = { 255, 255, 255, m->color.alpha };
-		setMaterial(color, m->surfaceProps);
+		if(useModern && !LightmapEnable)
+			setMaterial(atomic->geometry->flags, m->color, m->surfaceProps);
+		else
+			setMaterial(color, m->surfaceProps);
 
 		if(m->texture)
 			d3d::setTexture(0, m->texture);
 		else
 			d3d::setTexture(0, gpWhiteTexture);
+#ifdef MODERN_FEATURES
+		setPixelShader(useModern ? modernWorld_PS : neoWorldVC_PS);
+#else
 		setPixelShader(neoWorldVC_PS);
+#endif
 
 		drawInst(header, inst);
 		inst++;
 	}
 	d3d::setTexture(1, nil);
+#ifdef MODERN_FEATURES
+	if(useModern) d3d::setTexture(2, nil);
+#endif
 }
 
 void
@@ -268,7 +317,12 @@ CreateWorldPipe(void)
 #include "shaders/obj/neoWorldVC_PS.inc"
 	neoWorldVC_PS = rw::d3d::createPixelShader(neoWorldVC_PS_cso);
 	assert(neoWorldVC_PS);
-
+#ifdef MODERN_FEATURES
+#include "shaders/obj/modernWorld_VS.inc"
+#include "shaders/obj/modernWorld_PS.inc"
+	modernWorld_VS = rw::d3d::createVertexShader(modernWorld_VS_cso);
+	modernWorld_PS = rw::d3d::createPixelShader(modernWorld_PS_cso);
+#endif
 
 	rw::d3d9::ObjPipeline *pipe = rw::d3d9::ObjPipeline::create();
 	pipe->instanceCB = rw::d3d9::defaultInstanceCB;
@@ -280,6 +334,10 @@ CreateWorldPipe(void)
 void
 DestroyWorldPipe(void)
 {
+#ifdef MODERN_FEATURES
+	rw::d3d::destroyVertexShader(modernWorld_VS); modernWorld_VS = nil;
+	rw::d3d::destroyPixelShader(modernWorld_PS); modernWorld_PS = nil;
+#endif
 	rw::d3d::destroyVertexShader(neoWorld_VS);
 	neoWorld_VS = nil;
 	rw::d3d::destroyPixelShader(neoWorldVC_PS);
@@ -303,7 +361,13 @@ static void *neoGloss_PS;
 static void
 glossRenderCB(rw::Atomic *atomic, rw::d3d9::InstanceDataHeader *header)
 {
+#ifdef MODERN_FEATURES
+	modernRenderingRoad = true;
+#endif
 	worldRenderCB(atomic, header);
+#ifdef MODERN_FEATURES
+	modernRenderingRoad = false;
+#endif
 
 	using namespace rw;
 	using namespace rw::d3d;

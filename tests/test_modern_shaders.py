@@ -20,14 +20,17 @@ for name in ("modernAA", "modernBloom"):
     if expected != actual:
         raise SystemExit(name + '_frag.inc is stale; run makeinc_glsl.sh ' + name + '.frag')
 
-for ext in ('vert', 'frag'):
-    source = (shader_dir / ('modernWorld.' + ext)).read_text()
-    expected = 'const char *modernWorld_' + ext + '_src =\n'
+for shader in ('modernWorld.vert', 'modernWorld.frag', 'modernLocal.frag',
+               'modernPed.frag', 'modernPed.vert', 'modernPedSkin.vert',
+               'modernVehicle.frag', 'modernVehicle.vert'):
+    name, ext = shader.split('.')
+    source = (shader_dir / shader).read_text()
+    expected = 'const char *' + name + '_' + ext + '_src =\n'
     for line in source.splitlines():
         expected += ('"' + line + r'\n"' if line else '') + '\n'
     expected += ';\n'
-    if (shader_dir / ('obj/modernWorld_' + ext + '.inc')).read_text() != expected:
-        raise SystemExit('modernWorld_' + ext + '.inc is stale')
+    if (shader_dir / ('obj/' + name + '_' + ext + '.inc')).read_text() != expected:
+        raise SystemExit(name + '_' + ext + '.inc is stale')
 
 subprocess.run(['python3', str(root / 'tests/generate_modern_fxaa.py'), '--check'], check=True)
 fxaa = (shader_dir / 'modernFXAA.frag').read_text().replace(
@@ -41,6 +44,14 @@ for name in ('modernAA', 'modernBloom', 'modernFXAA'):
     if (bytecode != embedded or bytecode[:4] != bytes.fromhex('0003ffff') or
             bytecode[-4:] != bytes.fromhex('ffff0000')):
         raise SystemExit(name + '_PS.inc is stale or is not shader model 3 bytecode')
+
+for stage, magic in (('VS', '0003feff'), ('PS', '0003ffff')):
+    name = 'modernWorld_' + stage
+    code = (shader_dir / ('obj/' + name + '.cso')).read_bytes()
+    inc = (shader_dir / ('obj/' + name + '.inc')).read_text()
+    embedded = bytes(int(v, 16) for v in re.findall(r'0x([0-9a-fA-F]{2})', inc))
+    if code != embedded or code[:4] != bytes.fromhex(magic) or code[-4:] != bytes.fromhex('ffff0000'):
+        raise SystemExit(name + '.inc is stale or not complete SM3 bytecode')
 
 
 def load_c_string(path):
@@ -71,3 +82,10 @@ with tempfile.TemporaryDirectory() as tmp:
                               vertex_header + (shader_dir / 'modernWorld.vert').read_text())
         world_frag.write_text(prefix + fragment_header + (shader_dir / 'modernWorld.frag').read_text())
         subprocess.run(['glslangValidator', '-l', str(world_vert), str(world_frag)], check=True)
+        local = (shader_dir / 'modernLocal.frag').read_text()
+        for vertname, fragname in (('modernPed', 'modernPed'), ('modernPedSkin', 'modernPed'),
+                                   ('modernVehicle', 'modernVehicle')):
+            world_vert.write_text(prefix + '#define DIRECTIONALS\n#define POINTLIGHTS\n#define SPOTLIGHTS\n' +
+                                  vertex_header + (shader_dir / (vertname + '.vert')).read_text())
+            world_frag.write_text(prefix + fragment_header + local + (shader_dir / (fragname + '.frag')).read_text())
+            subprocess.run(['glslangValidator', '-l', str(world_vert), str(world_frag)], check=True)
