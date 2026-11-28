@@ -17,14 +17,22 @@ c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g \
   tests/modern_visual_policy.cpp -o /tmp/modern_visual_policy
 /tmp/modern_visual_policy
 python3 tests/test_priority_scan_contract.py
+python3 tests/test_radar_distance_contract.py
+INCLUDES=$(find src -type d -printf ' -I%p')
+c++ -w -std=c++11 -fsanitize=undefined -ffunction-sections -fdata-sections \
+  -DRW_GL3 -DLIBRW_SDL2 -DLIBRW $INCLUDES -Ivendor/librw -Ivendor/sdl2/include \
+  tests/modern_config_distance.cpp -Wl,--gc-sections -o /tmp/modern_config_distance
+/tmp/modern_config_distance
 ```
 
 This exercises master-off and invalid-value behavior, scene eligibility,
 far-clip restoration decisions, priority-distance scaling, alternating
 population horizons (including startup batches), distance bounds, and
 memory-budget calculations. The source-level priority scan guard checks the
-renderer wiring but does not simulate streaming or drawing. Device
-playtesting and visual inspection are still necessary.
+renderer wiring but does not simulate streaming or drawing. The radar/distance
+contract checks the disabled runtime multiplier, menu and bottom-left placement
+wiring; it does not render the HUD. The config test exercises the real preset,
+clamping and getter. Device playtesting and visual inspection are still necessary.
 
 ## Experimental post-processing
 

@@ -40,8 +40,13 @@ jobs:
           c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g tests/modern_visual_policy.cpp -o /tmp/modern_visual_policy
           /tmp/modern_visual_policy
           python3 tests/test_priority_scan_contract.py
+          python3 tests/test_radar_distance_contract.py
           python3 tests/test_scene_load_contract.py
           INCLUDES=$(find src -type d -printf ' -I%p')
+          c++ -w -std=c++11 -fsanitize=undefined -ffunction-sections -fdata-sections \
+            -DRW_GL3 -DLIBRW_SDL2 -DLIBRW $INCLUDES -Ivendor/librw -Ivendor/sdl2/include \
+            tests/modern_config_distance.cpp -Wl,--gc-sections -o /tmp/modern_config_distance
+          /tmp/modern_config_distance
           c++ -w -std=c++11 -pthread -ffunction-sections -fdata-sections \
             -DANDROID -DRW_GL3 -DLIBRW_SDL2 -DLIBRW -Itests/android_stubs \
             $INCLUDES -Ivendor/librw -Ivendor/sdl2/include tests/android_cdstream.cpp \

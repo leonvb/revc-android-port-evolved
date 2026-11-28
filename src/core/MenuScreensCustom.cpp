@@ -134,12 +134,6 @@ void ModernOptionAfterChange(int8 before, int8 after)
 	FrontEndMenuManager.SaveSettings();
 }
 
-void ModernLodAfterChange(float before, float after)
-{
-	CModernConfig::MarkCustomPresetIfNeeded();
-	FrontEndMenuManager.SaveSettings();
-}
-
 void RestoreDefModern(int8 action)
 {
 	if (action != FEOPTION_ACTION_SELECT)
@@ -881,7 +875,6 @@ CMenuScreenCustom aScreens[] = {
 		MENUACTION_CFO_SELECT,	"FEM_HFP", { new CCFOSelect(&CModernConfig::m_bHighFpsPhysicsFix, "Modern", "HighFpsPhysicsFix", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
 		MENUACTION_CFO_SELECT,	"FEM_DRV", { new CCFOSelect(&CModernConfig::m_nDrivingStyle, "Modern", "DrivingStyle", modernDrivingStyles, ARRAY_SIZE(modernDrivingStyles), false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
 		MENUACTION_CFO_SELECT,	"FEM_MAC", { new CCFOSelect(&CModernConfig::m_bMidAirControl, "Modern", "MidAirControl", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
-		MENUACTION_CFO_SLIDER,	"FEM_LDM", { new CCFOSlider(&CModernConfig::m_fLodDistMultiplier, "Modern", "LodDistMultiplier", 1.0f, 4.0f, ModernLodAfterChange) }, 0, 0, MENUALIGN_LEFT,
 #if defined(EXTENDED_COLOURFILTER) && (defined(RW_OPENGL) || defined(RW_D3D9))
 		MENUACTION_CFO_SELECT,	"FEM_BLM", { new CCFOSelect(&CModernConfig::m_nNeonBloom, "Modern", "NeonBloom", modernBloomOpts, ARRAY_SIZE(modernBloomOpts), false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
 #endif

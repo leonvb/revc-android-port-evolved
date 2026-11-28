@@ -196,11 +196,7 @@ void CGpsRoute::DrawDistance()
 	CFont::SetCentreSize(SCREEN_WIDTH); CFont::SetPropOn();
 	CFont::SetBackgroundOff(); CFont::SetDropShadowPosition(1);
 	CFont::SetDropColor(CRGBA(0,0,0,255)); CFont::SetColor(CRGBA(255,255,255,255));
-#ifdef ANDROID
-	CFont::PrintString(SCREEN_SCALE_X(RADAR_LEFT + RADAR_WIDTH*0.5f), SCREEN_SCALE_Y(RADAR_TOP + RADAR_HEIGHT + 6.0f), wide);
-#else
 	CFont::PrintString(SCREEN_SCALE_X(RADAR_LEFT + RADAR_WIDTH*0.5f), SCREEN_SCALE_FROM_BOTTOM(RADAR_BOTTOM - 6.0f), wide);
-#endif
 	CFont::SetDropShadowPosition(0);
 }
 #endif

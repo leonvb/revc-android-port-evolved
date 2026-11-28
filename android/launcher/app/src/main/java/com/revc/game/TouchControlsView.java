@@ -552,10 +552,8 @@ public class TouchControlsView extends View {
         placeCircle(BTN_R3, faceCx, faceCy - spread - btnR * 1.9f, shR);
         b(BTN_R3).label = "MIRAR\nATRÁS";
 
-        // Select (camera view), top area but clear of the radar (top-left,
-        // see RADAR_LEFT/TOP/WIDTH/HEIGHT in Radar.h -- roughly the left 21%
-        // of the screen). Round, like every other icon button now, instead
-        // of a wide rect the round artwork would get squashed into.
+        // Select (camera view), in the top area. Round, like the other icon
+        // buttons, instead of a wide rect that would squash the artwork.
         float camR = baseRadius * 0.32f;
         float camCx = Math.max(areaLeft + margin + camR, areaLeft + (areaRight - areaLeft) * 0.24f);
         placeCircle(BTN_SELECT, camCx, areaTop + margin + camR, camR);
