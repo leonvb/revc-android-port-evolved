@@ -26,6 +26,10 @@
 #include "SaveBuf.h"
 #ifdef MODERN_FEATURES
 #include "ModernConfig.h"
+#include "ModernTraversalMath.h"
+#include "CutsceneMgr.h"
+#include "Record.h"
+#include "Timer.h"
 #include "ModernWheels.h"
 #include "Frontend.h"
 #endif
@@ -52,8 +56,42 @@ GetPadFromPlayer(CPlayerPed*)
 	return CPad::GetPad(0);
 }
 
+#ifdef MODERN_FEATURES
+// Runtime-only state: do not add fields to the serialized player structure.
+static ModernTraversalMath::Pivot s_modernPivot;
+static CPlayerPed *s_pivotOwner;
+
+static bool
+ModernLocomotionAllowed(CPlayerPed *player, CPad *pad)
+{
+	return player == FindPlayerPed() && pad && CModernConfig::m_bMasterEnable &&
+		CModernConfig::m_bHoldToSprint && !pad->ArePlayerControlsDisabled() &&
+		!CTimer::GetIsPaused() && !CReplay::IsPlayingBack() && !CRecordDataForGame::IsPlayingBack() &&
+		!CCutsceneMgr::IsCutsceneProcessing() && TheCamera.WhoIsInControlOfTheCamera == CAMCONTROL_GAME &&
+		!TheCamera.m_WideScreenOn && TheCamera.pTargetEntity == player && !player->bInVehicle &&
+		!player->m_attachedTo && player->m_fHealth > 0.0f && player->m_objective == OBJECTIVE_NONE;
+}
+
+static void
+ModernBailoutRecovery(CPlayerPed *player, CPad *pad)
+{
+	if (!ModernLocomotionAllowed(player, pad) || !pad->GetTarget() ||
+		player->m_nPedState != PED_FALL || !player->bIsStanding || player->m_getUpTimer == UINT32_MAX)
+		return;
+	CAnimBlendAssociation *roll = RpAnimBlendClumpGetAssociation(player->GetClump(), ANIM_STD_ROLLOUT_LHS);
+	if (!roll) roll = RpAnimBlendClumpGetAssociation(player->GetClump(), ANIM_STD_ROLLOUT_RHS);
+	uint32 now = CTimer::GetTimeInMilliseconds();
+	if (roll && roll->hierarchy->totalLength > 0.0f && roll->GetProgress() >= 0.75f &&
+		(int32)(player->m_getUpTimer - now) > 100)
+		player->m_getUpTimer = now + 100;
+}
+#endif
+
 CPlayerPed::~CPlayerPed()
 {
+#ifdef MODERN_FEATURES
+	if (s_pivotOwner == this) { s_modernPivot.Reset(); s_pivotOwner = nil; }
+#endif
 	delete m_pWanted;
 }
 
@@ -274,6 +312,9 @@ CPlayerPed::ReApplyMoveAnims(void)
 void
 CPlayerPed::SetInitialState(void)
 {
+#ifdef MODERN_FEATURES
+	if (s_pivotOwner == this) { s_modernPivot.Reset(); s_pivotOwner = nil; }
+#endif
 	m_nDrunkenness = 0;
 	m_nFadeDrunkenness = 0;
 	CMBlur::ClearDrunkBlur();
@@ -1582,9 +1623,22 @@ CPlayerPed::PlayerControlZelda(CPad *padUsed)
 
 		float maxAcc = 0.07f * CTimer::GetTimeStep();
 		m_fMoveSpeed = Min(padMoveInGameUnit, m_fMoveSpeed + maxAcc);
+#ifdef MODERN_FEATURES
+		if (ModernLocomotionAllowed(this, padUsed) && IsPedInControl() && !bIsDucking && !padUsed->GetTarget()) {
+			if (s_pivotOwner != this) { s_modernPivot.Reset(); s_pivotOwner = this; }
+			float factor = s_modernPivot.Update(leftRight / 128.0f, upDown / 128.0f,
+				m_fMoveSpeed, CTimer::GetTimeStepInSeconds());
+			m_fMoveSpeed = Min(m_fMoveSpeed, padMoveInGameUnit * factor);
+		} else {
+			s_modernPivot.Reset(); s_pivotOwner = nil;
+		}
+#endif
 
 	} else {
 		m_fMoveSpeed = 0.0f;
+#ifdef MODERN_FEATURES
+		s_modernPivot.Reset(); s_pivotOwner = nil;
+#endif
 	}
 
 	if (m_nPedState == PED_JUMP) {
@@ -1754,6 +1808,13 @@ CPlayerPed::ProcessControl(void)
 	if (m_nDrunkenness != 0) {
 		CMBlur::SetDrunkBlur(m_nDrunkenness / 255.f);
 	}
+#ifdef MODERN_FEATURES
+	CPad *modernPad = GetPadFromPlayer(this);
+	ModernBailoutRecovery(this, modernPad);
+	if (!ModernLocomotionAllowed(this, modernPad) || !IsPedInControl() || bIsDucking || modernPad->GetTarget()) {
+		s_modernPivot.Reset(); s_pivotOwner = nil;
+	}
+#endif
 	CPed::ProcessControl();
 	SetNearbyPedsToInteractWithPlayer();
 	if (bWasPostponed)
@@ -1875,10 +1936,16 @@ CPlayerPed::ProcessControl(void)
 					    )
 #endif
 					) {
+#ifdef MODERN_FEATURES
+					s_modernPivot.Reset(); s_pivotOwner = nil;
+#endif
 					if (padUsed)
 						PlayerControl1stPersonRunAround(padUsed);
 
 				} else if (m_nPedState == PED_FIGHT) {
+#ifdef MODERN_FEATURES
+					s_modernPivot.Reset(); s_pivotOwner = nil;
+#endif
 					if (padUsed)
 						PlayerControlFighter(padUsed);
 
