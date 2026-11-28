@@ -34,12 +34,13 @@ This folder contains the architectural design and phased engineering plan for mo
 | [04 — Rendering and visuals](04-rendering-and-visuals.md) | Modern rendering work removed; existing renderer retained | — |
 | [05 — Navigation, Checkpoints & Quality of Life](05-navigation-and-qol.md) | GTA IV/V-style 3D/minimap GPS route line (`ThePaths` A*), automatic post-mission saves, mid-mission stage checkpoints, faster interior/cutscene fades | `Radar.cpp`, `PathFind.cpp`, `PCSave.cpp`, `GameLogic.cpp`, `Script.cpp` |
 | [06 — Android & Mobile UX Polish](06-android-and-mobile-ux.md) | Context-aware touch HUD transitions, rich `VibrationEffect` haptics via JNI, gyroscope ADS fine-aiming, analog triggers/throttle gestures, thermal/FPS pacing | `TouchControlsView.java`, `GameActivity.java`, `TouchControls.cpp`, `JavaWrapper.cpp`, `sdl2.cpp` |
+| [07 — Fixed Controls, Camera, Autosave, Foot IK & Ragdolls](07-controls-camera-autosave-ragdoll-plan.md) | Current `modern`-based implementation plan for fixed modern gamepad controls, analog triggers, camera/aim, FPS settings, safe autosave, foot IK and ragdolls | Input backends, `Pad.cpp`, `Cam.cpp`, save/script systems, `PedIK.cpp`, ped physics |
 
 ---
 
 ## Recommended Implementation Phases
 
-See **[00 — Phased Implementation Plan & Release Schedule](00-implementation-phases.md)** for milestones, dependencies, risk levels, and acceptance gates. Phase 6 was removed:
+See **[00 — Phased Implementation Plan & Release Schedule](00-implementation-phases.md)** for earlier milestones, dependencies, risk levels, and acceptance gates. For the newer controller, FPS, autosave, camera, aim, foot IK and ragdoll requirements, use [Doc 07](07-controls-camera-autosave-ragdoll-plan.md), which supersedes conflicting earlier proposals for those topics and targets `modern`. Phase 6 was removed:
 
 1. **Phase 0 — Foundation**: `config.h` + `reVC.ini` `[Modern]` settings, Pause Menu **"Modernization"** page, `CTimer` exponential time-step helpers, and Android `30 / 60 / 90 / 120 FPS` LTPO display pacing (`M0.1–M0.2`).
 2. **Phase 1 — High-FPS Physics & Driving**: 60/120 FPS physics & boat drag parity fixes, Pacejka-lite progressive tire slip/drifting & weight transfer, and modern transmission + mid-air jump control (`M1.1–M1.3`, [Doc 01](01-physics-and-driving.md)).
