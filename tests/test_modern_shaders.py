@@ -22,7 +22,8 @@ for name in ("modernAA", "modernBloom"):
 
 for shader in ('modernWorld.vert', 'modernWorld.frag', 'modernLocal.frag',
                'modernPed.frag', 'modernPed.vert', 'modernPedSkin.vert',
-               'modernVehicle.frag', 'modernVehicle.vert'):
+               'modernVehicle.frag', 'modernVehicle.vert',
+               'directionalShadow.vert', 'directionalShadow.frag'):
     name, ext = shader.split('.')
     source = (shader_dir / shader).read_text()
     expected = 'const char *' + name + '_' + ext + '_src =\n'
@@ -89,6 +90,9 @@ with tempfile.TemporaryDirectory() as tmp:
         world_vert.write_text(prefix + '#define DIRECTIONALS\n#define POINTLIGHTS\n#define SPOTLIGHTS\n' +
                               vertex_header + (shader_dir / 'modernWorld.vert').read_text())
         world_frag.write_text(prefix + fragment_header + (shader_dir / 'modernWorld.frag').read_text())
+        subprocess.run(['glslangValidator', '-l', str(world_vert), str(world_frag)], check=True)
+        world_vert.write_text(prefix + vertex_header + (shader_dir / 'directionalShadow.vert').read_text())
+        world_frag.write_text(prefix + fragment_header + (shader_dir / 'directionalShadow.frag').read_text())
         subprocess.run(['glslangValidator', '-l', str(world_vert), str(world_frag)], check=True)
         local = (shader_dir / 'modernLocal.frag').read_text()
         for vertname, fragname in (('modernPed', 'modernPed'), ('modernPedSkin', 'modernPed'),

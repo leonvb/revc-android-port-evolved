@@ -155,6 +155,7 @@ LookupModernFallbackText(const char *key)
 		{ "FEM_BLM", "NEON BLOOM" },
 		{ "FEM_DPL", "DYNAMIC POINT LIGHTS" },
 		{ "FEM_WET", "WET ROAD REFLECTIONS" },
+		{ "FEM_RSH", "SHADOW MAPS (EXPERIMENTAL)" },
 		{ "FEM_FXA", "FXAA 3.11" },
 		{ "FEM_EAA", "EDGE AA (EXPERIMENTAL)" },
 		{ "FEM_ASV", "POST-MISSION AUTOSAVE" },

@@ -1648,6 +1648,10 @@ Idle(void *arg)
 		CRenderer::PreRender();
 		tbEndTimer("PreRender");
 
+#if defined(MODERN_FEATURES) && defined(RW_GL3) && defined(EXTENDED_PIPELINES)
+		CustomPipes::RenderDirectionalShadowMap();
+#endif
+
 #ifdef FIX_BUGS
 		RwRenderStateSet(rwRENDERSTATEZWRITEENABLE, (void *)FALSE); // TODO: temp? this fixes OpenGL render but there should be a better place for this
 		// This has to be done BEFORE RwCameraBeginUpdate

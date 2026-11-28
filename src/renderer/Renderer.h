@@ -69,6 +69,10 @@ public:
 	static void Init(void);
 	static void Shutdown(void);
 	static void PreRender(void);
+#if defined(MODERN_FEATURES) && defined(RW_GL3) && defined(EXTENDED_PIPELINES)
+	// Enumerates already-streamed candidates, not a separate world scan.
+	static void ForEachShadowCandidate(void (*visit)(CEntity *, void *), void *data);
+#endif
 
 	static void RenderRoads(void);
 	static void RenderFadingInEntities(void);

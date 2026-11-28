@@ -74,6 +74,9 @@ void CustomPipeRegister(void);
 void CustomPipeRegisterGL(void);
 void CustomPipeInit(void);
 void CustomPipeShutdown(void);
+#if defined(MODERN_FEATURES) && defined(RW_GL3)
+void RenderDirectionalShadowMap(void);
+#endif
 void SetTxdFindCallback(void);
 
 extern bool bRenderingEnvMap;

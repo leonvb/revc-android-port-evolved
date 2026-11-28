@@ -81,6 +81,23 @@ c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g \
 
 This tests bounded per-object light selection, not rendered lighting.
 
+## Directional shadow frustum fitting
+
+```sh
+c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g \
+  tests/directional_shadow_fit.cpp -o /tmp/directional_shadow_fit
+/tmp/directional_shadow_fit
+c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g \
+  tests/directional_shadow_plan.cpp -o /tmp/directional_shadow_plan
+/tmp/directional_shadow_plan
+python3 tests/directional_shadow_depth.py
+```
+
+These check frustum and fitting math, texel snapping, caster bounds and capacity,
+daylight transitions, invalid inputs, randomized coverage, and the RGB8 depth
+packing reference. Shader source/link checks are in `test_modern_shaders.py`.
+These tests do not exercise the GPU shadow pass or validate its visual output.
+
 ## Android CD streamer and scripted scene loads
 
 The host-side test compiles the actual Android streamer using minimal JNI/log
