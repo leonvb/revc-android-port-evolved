@@ -11,6 +11,14 @@ inline float LodMultiplier(bool enabled, float value)
 	if (!enabled || !(value >= 1.0f)) return 1.0f; // also catches NaN
 	return value > 4.0f ? 4.0f : value;
 }
+// The extended horizon is suspended while high-distance LOD flicker remains
+// unresolved. Preserve the old saved setting, but never apply it at runtime.
+inline float ActiveLodMultiplier(bool enabled, float configuredLod)
+{
+	(void)enabled;
+	(void)configuredLod;
+	return 1.0f;
+}
 inline float SceneLodMultiplier(bool eligible, float configuredLod)
 {
 	return eligible ? LodMultiplier(true, configuredLod) : 1.0f;

@@ -130,7 +130,7 @@ CModernConfig::ApplyPreset(int8 preset)
 		m_bLedgeMantling = 1;
 		m_fMaxMantleHeight = 2.15f;
 
-		m_fLodDistMultiplier = 2.2f;
+		m_fLodDistMultiplier = 1.0f;
 		m_nNeonBloom = 2;
 		m_bFxaa = 1;
 		m_bExperimentalEdgeAA = 0;
@@ -204,7 +204,7 @@ CModernConfig::ClampValues()
 float
 CModernConfig::GetLodDistanceMultiplier()
 {
-	return ModernVisualPolicy::LodMultiplier(m_bMasterEnable != 0, m_fLodDistMultiplier);
+	return ModernVisualPolicy::ActiveLodMultiplier(m_bMasterEnable != 0, m_fLodDistMultiplier);
 }
 
 int32

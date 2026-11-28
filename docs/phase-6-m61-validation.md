@@ -1,49 +1,31 @@
-# M6.1 draw distance: validation status
+# M6.1 draw distance: suspended
 
-This is a first implementation, not a completed milestone. It adds a 1–4×
-Modern draw-distance slider (default 2.2× in the Modern preset), preserves the
-Classic/master-off setting at 1×, extends the outdoor far clip and fog, and
-moderately extends selected population generation/removal distances. The
-original generation multiplier is unchanged for other systems. Alternate traffic
-spawn batches retain the original near horizon; the initial traffic batch and
-wanted-car spawns use their original distances. Pedestrian spawn batches retain
-the near radius; forced car generators retain their original range.
-The slider compounds the existing Display draw-distance setting. The actual
-far clip is capped at 2000 world units unless the original clip is already
-larger; interiors, cutscenes, scripted/cinematic and top-down cameras keep
-their normal distances. Existing pool,
-model and renderer limits can still cause pop-in or dropped distant entities.
+The Modern extended draw-distance feature is suspended after reports of distant
+flicker even at low settings and alternating low/high detail nearby at high
+settings. Its slider is hidden, and the active Modern multiplier is always
+1.0, including when an older configuration contains a higher saved value.
+The Modern preset no longer selects 2.2×. The existing Display draw-distance
+control and the camera's normal FOV/height scaling are unchanged. Other Modern
+visual features remain independently available.
 
-On supported 64-bit PC/Android builds, Modern uses a streaming cache budget
-based on one quarter of startup free physical memory, with the existing 65 MiB
-minimum and a 512 MiB cap. Zero/unknown memory falls back to the Classic
-budget. This is a cache limit, not a reservation or a live memory-pressure
-measurement. Switch and 32-bit builds retain the existing budget. The budget
-is never reduced below the previous platform-derived Classic budget. A capable
-GPU and actual device memory pressure still need assessment.
+The previous experimental policy and the old saved setting are retained for
+possible future development; they do not extend the active camera LOD, far
+clip, fog, population horizon, or priority scan while suspended. The Modern
+streaming cache policy remains independent and never reduces the Classic cache
+budget. Android's synchronized streamer and scripted scene-load timer fix are
+unchanged.
 
-## Required before accepting M6.1
+## Before considering re-enabling
 
-- CI builds have passed for desktop GL3, Android GLES3, Switch GLES3, and
-  Windows D3D9 on the initial M6.1 commit. Run those targets on actual devices;
-  neither builds nor standalone tests replace in-game verification.
-- Compare Classic/master-off and Modern at 1×, 2.2× and 4× across clear, foggy
-  and rainy weather, including interiors, cutscenes, scripted cameras, aircraft,
-  bridges and island transitions. Check clipping, fade/pop-in, fog and missing
-  geometry as well as save/reload and live menu changes. The narrow priority
-  streaming wedge now retains its Classic size at higher Modern distances,
-  while the ordinary scan still reaches the extended horizon. Verify loading
-  and any stationary LOD flicker at high settings on-device; this change does
-  not eliminate depth fighting, resource pressure or all model overlap.
-- Inspect traffic and pedestrians near and far (including player surroundings),
-  mission/script behavior, culling, startup spawning and pool pressure. The
-  current change does not independently configure each generator or guarantee
-  zero pop-in.
-- Measure streaming churn, RAM/VRAM usage, CPU/GPU frame time and thermal
-  behavior on both constrained and high-memory target devices. Verify budget
-  changes and recovery when the master toggle is changed in game. Lower
-  settings or redesign limits if memory or frame-time budgets are exceeded.
+- Reproduce and identify the cause of high/low model alternation and distant
+  flicker. The previous priority-scan mitigation did not resolve the reports.
+- Verify Classic and Modern on real devices, including older saved settings,
+  different weather, live preset changes, interiors, cutscenes and island
+  transitions. Check the bottom-left radar, GPS route and touch-control overlap.
+- Measure streaming churn, RAM/VRAM, frame time and thermal behavior. Confirm
+  renderer lists and model/streaming limits at the full intended range.
 
-M6.2–M6.5 (bloom/FXAA, per-pixel lights, wet roads and directional shadows)
-are not implemented by this change and each requires separate shader/backend
-and device validation.
+Suspending this feature does not establish that other sources of flicker are
+fixed. M6.1 remains incomplete; see the other phase-6 status documents for the
+separate lighting and post-processing work. Real-time directional sun/moon
+shadow mapping remains unimplemented.

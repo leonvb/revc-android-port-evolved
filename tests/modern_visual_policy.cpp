@@ -12,6 +12,17 @@ int main()
 	assert(LodMultiplier(true, 8.0f) == 4.0f);
 	assert(LodMultiplier(true, std::numeric_limits<float>::quiet_NaN()) == 1.0f);
 	assert(LodMultiplier(true, 2.2f) == 2.2f);
+	// Both new and previously saved configurations must use the Classic
+	// horizon while the extended-distance feature is suspended.
+	for(bool enabled : {false, true}){
+		for(float saved : {1.0f, 1.01f, 2.2f, 4.0f, 100.0f, std::numeric_limits<float>::quiet_NaN()}){
+			float active = ActiveLodMultiplier(enabled, saved);
+			assert(active == 1.0f);
+			assert(SceneLodMultiplier(true, active) == 1.0f);
+			assert(GenerationMultiplier(active) == 1.0f);
+			assert(FarClip(500.0f, active) == 500.0f);
+		}
+	}
 	assert(SceneLodMultiplier(false, 4.0f) == 1.0f);
 	assert(SceneLodMultiplier(true, 2.2f) == 2.2f);
 	assert(SceneLodMultiplier(true, std::numeric_limits<float>::quiet_NaN()) == 1.0f);

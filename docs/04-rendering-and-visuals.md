@@ -1,5 +1,10 @@
 # 04 — Rendering, Lighting & World Visuals
 
+> Design targets below are not all implemented. Modern extended draw distance is
+> currently suspended due to reported flickering; see
+> [M6.1 status](phase-6-m61-validation.md). Directional shadow mapping remains
+> unimplemented.
+
 ## Overview & Goals
 `reVC` uses `librw` (`vendor/librw`), which already abstracts RenderWare pipelines over **OpenGL 3.3+**, **OpenGL ES 3.0+** (Android / Switch), and **Direct3D 9** (Windows), and already includes `EXTENDED_PIPELINES` (Neo vehicle gloss, world lightmaps, rim lighting) and `EXTENDED_COLOURFILTER` (`CPostFX`).
 

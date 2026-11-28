@@ -93,7 +93,7 @@ public:
 	static float m_fMaxMantleHeight;   // meters (default: 2.15f)
 
 	// Phase 6: Rendering, Lighting & World Visuals
-	static float m_fLodDistMultiplier; // 1.0f..4.0f (default: 1.0f in Classic)
+	static float m_fLodDistMultiplier; // legacy saved value; extended distance is suspended
 	static int8 m_nNeonBloom;          // 0 = Off, 1 = Low, 2 = High
 	static int8 m_bFxaa;               // 0/1
 	static int8 m_bExperimentalEdgeAA; // opt-in preview, not FXAA 3.11
@@ -112,7 +112,7 @@ public:
 	static bool ShouldWaitVSyncInGameplay();
 	static void ApplyFrameRateSettings();
 
-	// Phase 6: master-off and invalid values must always behave like Classic.
+	// Phase 6: currently returns 1.0 even for older saved extended-distance values.
 	static float GetLodDistanceMultiplier();
 
 	// Phase 1 (M1.1 / M1.2) runtime feature predicates
