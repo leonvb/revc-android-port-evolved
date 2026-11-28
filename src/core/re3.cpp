@@ -1134,15 +1134,17 @@ DebugMenuPopulate(void)
 #endif
 		DebugMenuAddVarBool8("Render", "Backface Culling", &gBackfaceCulling, nil);
 		DebugMenuAddVarBool8("Render", "PS2 Alpha test Emu", &gPS2alphaTest, nil);
+#ifndef MODERN_FEATURES
 		DebugMenuAddVarBool8("Render", "Frame limiter", &FrontEndMenuManager.m_PrefsFrameLimiter, nil);
-		DebugMenuAddVarBool8("Render", "VSynch", &FrontEndMenuManager.m_PrefsVsync, nil);
 		DebugMenuAddVar("Render", "Max FPS", &RsGlobal.maxFPS, nil, 1, 1, 1000, nil);
+#endif
+		DebugMenuAddVarBool8("Render", "VSynch", &FrontEndMenuManager.m_PrefsVsync, nil);
 #ifdef MODERN_FEATURES
 		static const char *dbgPresets[] = { "Classic", "Modern", "Custom" };
 		e = DebugMenuAddVar("Modern", "Preset", &CModernConfig::m_nPreset, [](){ CModernConfig::ApplyPreset(CModernConfig::m_nPreset); }, 1, MODERN_PRESET_CLASSIC, MODERN_PRESET_CUSTOM, dbgPresets);
 		DebugMenuEntrySetWrap(e, true);
 		DebugMenuAddVarBool8("Modern", "Master Enable", &CModernConfig::m_bMasterEnable, nil);
-		static const char *dbgFps[] = { "30 FPS", "60 FPS", "90 FPS", "120 FPS", "Native" };
+		static const char *dbgFps[] = { "30 FPS", "60 FPS", "90 FPS", "120 FPS", "Uncapped" };
 		e = DebugMenuAddVar("Graphics", "Frame rate", &CModernConfig::m_nFrameRate, CModernConfig::ApplyFrameRateSettings, 1, MODERN_FPS_30, MODERN_FPS_NATIVE, dbgFps);
 		DebugMenuEntrySetWrap(e, true);
 #endif
