@@ -50,6 +50,7 @@
 #include "Zones.h"
 #ifdef MODERN_FEATURES
 #include "ModernConfig.h"
+#include "ModernFrameRate.h"
 #endif
 
 #include "crossplatform.h"
@@ -581,7 +582,16 @@ bool LoadINISettings()
 #ifdef MODERN_FEATURES
 	ReadIniIfExists("Modern", "Preset", &CModernConfig::m_nPreset);
 	ReadIniIfExists("Modern", "MasterEnable", &CModernConfig::m_bMasterEnable);
-	ReadIniIfExists("Modern", "TargetFPS", &CModernConfig::m_nTargetFPS);
+	// Parse the canonical and legacy settings strictly before the generic CFO
+	// loader; malformed text must never silently become zero via strtol.
+	mINI::INIMap<std::string> graphicsFps = cfg.get("Graphics");
+	mINI::INIMap<std::string> modernFps = cfg.get("Modern");
+	std::string canonicalFps = graphicsFps.has("FrameRate") ? graphicsFps.get("FrameRate") : "";
+	std::string legacyLimiter = graphicsFps.has("FrameLimiter") ? graphicsFps.get("FrameLimiter") : "";
+	std::string legacyFps = modernFps.has("TargetFPS") ? modernFps.get("TargetFPS") : "";
+	int parsedFps = 0;
+	bool validCanonicalFps = ModernFrameRate::ParseInteger(canonicalFps.c_str(), parsedFps) && ModernFrameRate::Valid(parsedFps);
+	CModernConfig::m_nFrameRate = (int8)ModernFrameRate::Migrate(canonicalFps.c_str(), legacyLimiter.c_str(), legacyFps.c_str());
 	ReadIniIfExists("Modern", "HighFpsPhysicsFix", &CModernConfig::m_bHighFpsPhysicsFix);
 	ReadIniIfExists("Modern", "DrivingStyle", &CModernConfig::m_nDrivingStyle);
 	ReadIniIfExists("Modern", "MidAirControl", &CModernConfig::m_bMidAirControl);
@@ -641,6 +651,18 @@ bool LoadINISettings()
 
 #ifdef MODERN_FEATURES
 	CModernConfig::ApplyFrameRateSettings();
+	int projectedLimiter, projectedTarget;
+	bool legacyInSync = ModernFrameRate::ParseInteger(legacyLimiter.c_str(), projectedLimiter) &&
+		projectedLimiter == (CModernConfig::GetTargetFpsValue() > 0 ? 1 : 0) &&
+		ModernFrameRate::ParseInteger(legacyFps.c_str(), projectedTarget) &&
+		projectedTarget == CModernConfig::m_nFrameRate;
+	if (!validCanonicalFps || !legacyInSync) {
+		// Persist the canonical value and compatible downgrade projections once.
+		StoreIni("Graphics", "FrameRate", CModernConfig::m_nFrameRate);
+		StoreIni("Graphics", "FrameLimiter", (int32)(CModernConfig::GetTargetFpsValue() > 0));
+		StoreIni("Modern", "TargetFPS", CModernConfig::m_nFrameRate);
+		GetIniFile().write(cfg);
+	}
 #endif
 
 	return true;
@@ -679,7 +701,13 @@ void SaveINISettings()
 	StoreIni("Graphics", "VSync", FrontEndMenuManager.m_PrefsVsyncDisp);
 	StoreIni("Graphics", "Trails", CMBlur::BlurOn);
 #endif
+#ifdef MODERN_FEATURES
+	// Write consistent legacy projections for users who downgrade.
+	StoreIni("Graphics", "FrameRate", CModernConfig::m_nFrameRate);
+	StoreIni("Graphics", "FrameLimiter", (int32)(CModernConfig::GetTargetFpsValue() > 0));
+#else
 	StoreIni("Graphics", "FrameLimiter", FrontEndMenuManager.m_PrefsFrameLimiter);
+#endif
 	StoreIni("General", "SkinFile", FrontEndMenuManager.m_PrefsSkinFile, 256);
 	StoreIni("Controller", "Method", FrontEndMenuManager.m_ControlMethod);
 	StoreIni("General", "Language", FrontEndMenuManager.m_PrefsLanguage);
@@ -720,7 +748,7 @@ void SaveINISettings()
 #ifdef MODERN_FEATURES
 	StoreIni("Modern", "Preset", CModernConfig::m_nPreset);
 	StoreIni("Modern", "MasterEnable", CModernConfig::m_bMasterEnable);
-	StoreIni("Modern", "TargetFPS", CModernConfig::m_nTargetFPS);
+	StoreIni("Modern", "TargetFPS", CModernConfig::m_nFrameRate);
 	StoreIni("Modern", "HighFpsPhysicsFix", CModernConfig::m_bHighFpsPhysicsFix);
 	StoreIni("Modern", "DrivingStyle", CModernConfig::m_nDrivingStyle);
 	StoreIni("Modern", "MidAirControl", CModernConfig::m_bMidAirControl);
@@ -1106,16 +1134,18 @@ DebugMenuPopulate(void)
 #endif
 		DebugMenuAddVarBool8("Render", "Backface Culling", &gBackfaceCulling, nil);
 		DebugMenuAddVarBool8("Render", "PS2 Alpha test Emu", &gPS2alphaTest, nil);
+#ifndef MODERN_FEATURES
 		DebugMenuAddVarBool8("Render", "Frame limiter", &FrontEndMenuManager.m_PrefsFrameLimiter, nil);
-		DebugMenuAddVarBool8("Render", "VSynch", &FrontEndMenuManager.m_PrefsVsync, nil);
 		DebugMenuAddVar("Render", "Max FPS", &RsGlobal.maxFPS, nil, 1, 1, 1000, nil);
+#endif
+		DebugMenuAddVarBool8("Render", "VSynch", &FrontEndMenuManager.m_PrefsVsync, nil);
 #ifdef MODERN_FEATURES
 		static const char *dbgPresets[] = { "Classic", "Modern", "Custom" };
 		e = DebugMenuAddVar("Modern", "Preset", &CModernConfig::m_nPreset, [](){ CModernConfig::ApplyPreset(CModernConfig::m_nPreset); }, 1, MODERN_PRESET_CLASSIC, MODERN_PRESET_CUSTOM, dbgPresets);
 		DebugMenuEntrySetWrap(e, true);
 		DebugMenuAddVarBool8("Modern", "Master Enable", &CModernConfig::m_bMasterEnable, nil);
-		static const char *dbgFps[] = { "30 FPS", "60 FPS", "90 FPS", "120 FPS", "Native" };
-		e = DebugMenuAddVar("Modern", "Target FPS", &CModernConfig::m_nTargetFPS, CModernConfig::ApplyFrameRateSettings, 1, MODERN_FPS_30, MODERN_FPS_NATIVE, dbgFps);
+		static const char *dbgFps[] = { "30 FPS", "60 FPS", "90 FPS", "120 FPS", "Uncapped" };
+		e = DebugMenuAddVar("Graphics", "Frame rate", &CModernConfig::m_nFrameRate, CModernConfig::ApplyFrameRateSettings, 1, MODERN_FPS_30, MODERN_FPS_NATIVE, dbgFps);
 		DebugMenuEntrySetWrap(e, true);
 #endif
 #ifdef NEW_RENDERER

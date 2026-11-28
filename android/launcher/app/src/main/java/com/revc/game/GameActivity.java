@@ -140,12 +140,13 @@ public class GameActivity extends SDLActivity {
 
     /**
      * Called from C++ (CJavaWrapper::SetTargetRefreshRate) on the SDL thread
-     * whenever the user changes Target FPS or Frame Limiter in reVC settings.
-     * fps <= 0 requests the panel's highest native refresh rate.
+     * whenever the user changes Frame rate in reVC settings.
+     * fps <= 0 hints a high display refresh; gameplay has no software cap.
+     * Android and the display may choose a different mode.
      */
     public void setTargetRefreshRate(final int fps) {
         requestedRefreshRateHz = fps;
-        runOnUiThread(() -> applyDisplayRefreshRate(fps));
+        runOnUiThread(() -> applyDisplayRefreshRate(requestedRefreshRateHz));
     }
 
     private void applyDisplayRefreshRate(int targetFps) {

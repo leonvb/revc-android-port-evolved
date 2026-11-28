@@ -70,7 +70,7 @@ public:
 	static int8 m_bMasterEnable;       // 0 = Classic behavior, 1 = Modern features active
 
 	// Phase 0 (M0.2): Frame-rate target & display refresh pacing
-	static int8 m_nTargetFPS;          // eModernFpsTarget
+	static int8 m_nFrameRate;          // eModernFpsTarget
 
 	// Phase 1: High-FPS physics parity & driving dynamics
 	static int8 m_bHighFpsPhysicsFix;  // 0/1
@@ -109,6 +109,8 @@ public:
 	// Frame-rate target helpers (M0.2)
 	static int32 GetTargetFpsValue();
 	static bool ShouldFrameLimitGameplay();
+	static bool ShouldRenderFrame();
+	static bool ShouldRenderMenuFrame();
 	static bool ShouldWaitVSyncInGameplay();
 	static void ApplyFrameRateSettings();
 

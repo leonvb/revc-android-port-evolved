@@ -3175,6 +3175,11 @@ CMenuManager::LoadSettings()
 		LoadINIControllerSettings();
 	}
 #endif
+#ifdef MODERN_FEATURES
+	// Also establish defaults when no INI exists (the legacy binary settings
+	// file is not the canonical source in Modern builds).
+	CModernConfig::ApplyFrameRateSettings();
+#endif
 
 #ifdef FIX_BUGS
 	TheCamera.m_fMouseAccelVertical = TheCamera.m_fMouseAccelHorzntl + 0.0005f;
@@ -4937,6 +4942,7 @@ CMenuManager::ProcessUserInput(uint8 goDown, uint8 goUp, uint8 optionSelected, u
 					m_PrefsVsyncDisp = true;
 					m_PrefsFrameLimiter = true;
 #ifdef MODERN_FEATURES
+					CModernConfig::m_nFrameRate = MODERN_FPS_30;
 					CModernConfig::ApplyFrameRateSettings();
 #endif
 					m_PrefsRadarMode = 0;
