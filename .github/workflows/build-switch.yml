@@ -49,9 +49,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: reVC-switch
-          path: |
-            reVC.nro
-            gamefiles/NVIDIA_FXAA_LICENSE.txt
+          path: reVC.nro
           if-no-files-found: error
 
   release:
@@ -72,8 +70,6 @@ jobs:
         with:
           tag_name: "v${{ inputs.version }}"
           name: "reVC v${{ inputs.version }}"
-          files: |
-            reVC.nro
-            gamefiles/NVIDIA_FXAA_LICENSE.txt
+          files: reVC.nro
           draft: false
           prerelease: false

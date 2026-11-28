@@ -15,7 +15,6 @@
 #include "rwgl3.h"
 #include "rwgl3shader.h"
 #include "rwgl3impl.h"
-#include "gl3fbomates.h"
 
 #define PLUGIN_ID 0
 
@@ -1200,46 +1199,24 @@ static bool32 renderScaleActive(void);
 static void ensureScaledFramebuffer(int winWidth, int winHeight);
 #endif
 
-// Framebuffer attachment operations for rebindFramebufferDepth. The default
-// framebuffer owns its depth buffer; only offscreen FBOs have attachments.
-struct FramebufferDepthOps
-{
-	Raster *&mate(Raster *raster) {
-		return PLUGINOFFSET(Gl3Raster, raster, nativeRasterOffset)->fboMate;
-	}
-	void detach(Raster *color) {
-		Gl3Raster *fb = PLUGINOFFSET(Gl3Raster, color, nativeRasterOffset);
-		if(!fb->fbo) return;
-		bindFramebuffer(fb->fbo);
-		if(gl3Caps.gles)
-			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0);
-		else
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, 0, 0);
-	}
-	void attach(Raster *color, Raster *depth) {
-		Gl3Raster *fb = PLUGINOFFSET(Gl3Raster, color, nativeRasterOffset);
-		Gl3Raster *zb = PLUGINOFFSET(Gl3Raster, depth, nativeRasterOffset);
-		if(!fb->fbo) return;
-		bindFramebuffer(fb->fbo);
-		if(gl3Caps.gles)
-			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, zb->texid);
-		else
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, zb->texid, 0);
-	}
-};
-
 static void
 setFrameBuffer(Camera *cam)
 {
 	Raster *fbuf = cam->frameBuffer->parent;
-	Raster *zbuf = cam->zBuffer ? cam->zBuffer->parent : nil;
+	Raster *zbuf = cam->zBuffer->parent;
 	assert(fbuf);
 
 	Gl3Raster *natfb = PLUGINOFFSET(Gl3Raster, fbuf, nativeRasterOffset);
+	Gl3Raster *natzb = PLUGINOFFSET(Gl3Raster, zbuf, nativeRasterOffset);
 	assert(fbuf->type == Raster::CAMERA || fbuf->type == Raster::CAMERATEXTURE);
 
 #ifdef LIBRW_SDL2
-	// The scaled window framebuffer owns its own depth/stencil attachment.
+	// Android render-scale path: the main camera renders into our own
+	// fixed-size offscreen FBO instead of the window's default framebuffer
+	// (natfb->fbo, which is always 0 for a CAMERA raster). It owns its own
+	// depth/stencil renderbuffer sized to match, so none of the fbo-mate
+	// bookkeeping below - which assumes the window manages its own depth
+	// buffer - applies to it.
 	if(fbuf->type == Raster::CAMERA && renderScaleActive()){
 		int winW, winH;
 		SDL_GetWindowSize(glGlobals.window, &winW, &winH);
@@ -1249,10 +1226,38 @@ setFrameBuffer(Camera *cam)
 	}
 #endif
 
-	FramebufferDepthOps ops;
-	rebindFramebufferDepth(fbuf, zbuf, ops);
-	// Reassignment can temporarily bind a different FBO to detach its depth.
+	// Have to make sure depth buffer is attached to FB's fbo
 	bindFramebuffer(natfb->fbo);
+	if(zbuf){
+		if(natfb->fboMate == zbuf){
+			// all good
+			assert(natzb->fboMate == fbuf);
+		}else{
+			if(natzb->fboMate){
+				// have to detatch from fbo first!
+				Gl3Raster *oldfb = PLUGINOFFSET(Gl3Raster, natzb->fboMate, nativeRasterOffset);
+				if(oldfb->fbo){
+					bindFramebuffer(oldfb->fbo);
+					glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, 0, 0);
+					bindFramebuffer(natfb->fbo);
+				}
+				oldfb->fboMate = nil;
+			}
+			natfb->fboMate = zbuf;
+			natzb->fboMate = fbuf;
+			if(natfb->fbo){
+				if(gl3Caps.gles)
+					glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, natzb->texid);
+				else
+					glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, natzb->texid, 0);
+			}
+		}
+	}else{
+		// remove z-buffer
+		if(natfb->fboMate && natfb->fbo)
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, 0, 0);
+		natfb->fboMate = nil;
+	}
 }
 
 #ifdef LIBRW_SDL2

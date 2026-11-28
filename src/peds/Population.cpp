@@ -1,7 +1,4 @@
 #include "common.h"
-#ifdef MODERN_FEATURES
-#include "ModernVisualPolicy.h"
-#endif
 
 #include "Game.h"
 #include "General.h"
@@ -380,17 +377,10 @@ CPopulation::Update(bool addPeds)
 			ms_nTotalPeds -= ms_nTotalCarPassengerPeds;
 			if (!CCutsceneMgr::IsRunning() && addPeds) {
 				float pcdm = PedCreationDistMultiplier();
-				float normalMaxDist = pcdm * ((MIN_CREATION_DIST + CREATION_RANGE) * TheCamera.GenerationDistMultiplier);
-				float spawnHorizon = 1.0f;
-#ifdef MODERN_FEATURES
-				// Expand only the outer radius on alternate batches, retaining
-				// the original near radius and pool/density limits.
-				spawnHorizon = ModernVisualPolicy::SpawnHorizon(TheCamera.GetModernLodMultiplier(), CTimer::GetFrameCounter());
-#endif
 				AddToPopulation(pcdm * (MIN_CREATION_DIST * TheCamera.GenerationDistMultiplier),
-					normalMaxDist * spawnHorizon,
+					pcdm * ((MIN_CREATION_DIST + CREATION_RANGE) * TheCamera.GenerationDistMultiplier),
 					pcdm * (MIN_CREATION_DIST + CREATION_RANGE) * OFFSCREEN_CREATION_MULT - CREATION_RANGE,
-					pcdm * (MIN_CREATION_DIST + CREATION_RANGE) * OFFSCREEN_CREATION_MULT, normalMaxDist);
+					pcdm * (MIN_CREATION_DIST + CREATION_RANGE) * OFFSCREEN_CREATION_MULT);
 			}
 		}
 	}
@@ -528,7 +518,7 @@ CPopulation::AddPed(ePedType pedType, uint32 miOrCopType, CVector const &coors, 
 }
 
 void
-CPopulation::AddToPopulation(float minDist, float maxDist, float minDistOffScreen, float maxDistOffScreen, float normalMaxDist)
+CPopulation::AddToPopulation(float minDist, float maxDist, float minDistOffScreen, float maxDistOffScreen)
 {
 	uint32 pedTypeToAdd;
 	int32 modelToAdd;
@@ -621,11 +611,6 @@ CPopulation::AddToPopulation(float minDist, float maxDist, float minDistOffScree
 		}
 		if (!addCop && m_AllRandomPedsThisType > PEDTYPE_PLAYER1)
 			pedTypeToAdd = m_AllRandomPedsThisType;
-
-		// Keep regular police spawns and their unchanged cull radius paired.
-		// Forced police and the initial population use their existing distances.
-		if (!addCop && pedTypeToAdd == PEDTYPE_COP && normalMaxDist >= 0.0f)
-			maxDist = normalMaxDist;
 
 		if (pedTypeToAdd >= PEDTYPE_GANG1 && pedTypeToAdd <= PEDTYPE_GANG9 && !isSecurityGuard) {
 			minDist += 30.0f;
@@ -1118,13 +1103,8 @@ CPopulation::ManagePopulation(void)
 			else if (ped->bDeadPedInFrontOfCar && ped->m_vehicleInAccident)
 				dist = 0.0f;
 
-			float cullHorizon = 1.0f;
-#ifdef MODERN_FEATURES
-			if (ped->m_nPedType != PEDTYPE_COP)
-				cullHorizon = TheCamera.GetModernPopulationHorizon();
-#endif
-			if (PedCreationDistMultiplier() * (PED_REMOVE_DIST_SPECIAL * TheCamera.GenerationDistMultiplier) * cullHorizon < dist ||
-				(!ped->bCullExtraFarAway && PedCreationDistMultiplier() * PED_REMOVE_DIST * TheCamera.GenerationDistMultiplier * cullHorizon < dist)) {
+			if (PedCreationDistMultiplier() * (PED_REMOVE_DIST_SPECIAL * TheCamera.GenerationDistMultiplier) < dist ||
+				(!ped->bCullExtraFarAway && PedCreationDistMultiplier() * PED_REMOVE_DIST * TheCamera.GenerationDistMultiplier < dist)) {
 				pedIsFarAway = true;
 			}
 #ifndef EXTENDED_OFFSCREEN_DESPAWN_RANGE

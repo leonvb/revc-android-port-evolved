@@ -25,7 +25,7 @@ Phase 0: Foundation (Settings, Toggles, TimeStep Math & 120 Hz Frame Pacing)
    │
    ├──► Phase 5: Player Traversal — Swimming, Mantling & Locomotion (Doc 03)
    │
-   └──► Phase 6: Modern Rendering, Neon Bloom, Wet Roads & Shadows (Doc 04)
+   └──► Phase 6: Modern rendering (removed; see Doc 04)
 ```
 
 *(Note: Phases 1, 2, and early parts of Phase 4/6 are loosely coupled and can be reordered if priorities shift, whereas **Phase 0** is a prerequisite for everything, and **Phase 4's** gyro/ADS touch buttons build naturally on **Phase 3's** Over-the-Shoulder aiming.)*
@@ -128,21 +128,10 @@ Phase 0: Foundation (Settings, Toggles, TimeStep Math & 120 Hz Frame Pacing)
 
 ---
 
-## Phase 6 — Modern Rendering, Lighting & World Visuals (`Doc 04`)
-**Goal:** Upgrade Vice City's 80s neon atmosphere, draw distances, lighting, and shadows across Desktop GL3, Android/Switch GLES3, and Windows D3D9 while keeping 60–120 FPS performance on mobile GPUs.
+## Phase 6 — Modern rendering removed
 
-| Milestone / PR | Scope & Files | Deliverable |
-| :--- | :--- | :--- |
-| **M6.1 — Extended Draw Distance & Streaming Budgets** | `src/core/Streaming.cpp`, `src/renderer/Renderer.cpp`, `src/peds/Population.cpp`, `src/control/CarCtrl.cpp` | 256–512 MB streaming RAM budget on 64-bit builds, `1.0x–4.0x` LOD distance slider (eliminating building pop-in across islands), and extended traffic/ped horizon persistence. |
-| **M6.2 — Dual-Kawase HDR Neon Bloom & FXAA 3.11** | `src/extras/postfx.cpp`, `src/extras/shaders/` (GLSL + GLES3 + HLSL) | Multi-mip Dual-Kawase emissive bloom (tuned with `CTimeCycle` so nighttime Ocean Drive neon/coronas glow without blowing out daytime skies) + single-pass FXAA 3.11 anti-aliasing. |
-| **M6.3 — Dynamic Per-Pixel Point Lights** | `src/renderer/PointLights.cpp`, `src/extras/custompipes*.cpp`, `neoWorldVC` / `neoVehicle` / `neoRimSkin` shaders | Per-pixel dynamic lighting from up to 8–12 nearby headlights, taillights, flashing police sirens, muzzle flashes, and explosions on buildings, cars, and peds. |
-| **M6.4 — Weather-Driven Wet-Road Reflections** | `src/renderer/Weather.cpp`, `src/extras/custompipes*.cpp`, `neoWorldVC` shader | Dynamic wet-asphalt reflections, puddle ripples, and neon/headlight streaks driven automatically by `CWeather::WetRoads` (`0.0` dry → `1.0` rain → gradual evaporation after rain), plus optional night-sheen toggle. |
-| **M6.5 — Real-Time Directional Sun/Moon Shadow Mapping** | `vendor/librw/src/gl/`, `src/renderer/Shadows.cpp`, `src/renderer/ShadowCamera.cpp`, world/vehicle shaders | Orthographic/2-cascade depth shadow map FBO with soft Poisson PCF filtering from `CTimeCycle` sun/moon angle for buildings, palm trees, vehicles, and peds. |
-
-- **Risk Level:** Medium–High (cross-API GLSL/GLES3/HLSL shader compilation and mobile tile-GPU bandwidth budgets).
-- **Exit / Acceptance Gate:**
-  - All shaders compile cleanly on **Android GLES 3.0+**, **Linux/macOS/Switch GL3**, and **Windows D3D9 & GL3** (all 5 CI workflows green).
-  - Graphics presets (`Classic`, `Balanced`, `High`, `Ultra`) maintain target **60–120 FPS** on flagship Android GPUs (Immortalis-G720 / Adreno 740+) with individual toggles for every pass.
+The Modern rendering work was removed at the project's request. The existing
+renderer and ordinary display settings remain; see [Doc 04](04-rendering-and-visuals.md).
 
 ---
 
@@ -167,4 +156,3 @@ Phase 0: Foundation (Settings, Toggles, TimeStep Math & 120 Hz Frame Pacing)
 | **Phase 3 — OTS Combat, Camera & Wheels** | 4 PRs (`M3.1–M3.4`) | Large | **Transformative** (modernizes core gameplay) | Phase 0 |
 | **Phase 4 — Android Haptics, Gyro & Touch** | 3 PRs (`M4.1–M4.3`) | Medium | **High** (flagship mobile feel) | Phase 0, Phase 3 |
 | **Phase 5 — Swimming & Ledge Mantling** | 3 PRs (`M5.1–M5.3`) | Medium–Large | **High** (removes 2002 frustrations) | Phase 0 |
-| **Phase 6 — Bloom, Lights, Wet Roads & Shadows** | 5 PRs (`M6.1–M6.5`) | Large | **Very High** (modern 80s neon visuals) | Phase 0 |

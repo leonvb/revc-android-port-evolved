@@ -1,6 +1,5 @@
 #include "common.h"
 #include "ModernConfig.h"
-#include "ModernVisualPolicy.h"
 
 #ifdef MODERN_FEATURES
 
@@ -39,14 +38,6 @@ int8 CModernConfig::m_bSwimming = 0;
 int8 CModernConfig::m_bLedgeMantling = 0;
 float CModernConfig::m_fMaxMantleHeight = 2.15f;
 
-float CModernConfig::m_fLodDistMultiplier = 1.0f;
-int8 CModernConfig::m_nNeonBloom = 0;
-int8 CModernConfig::m_bFxaa = 0;
-int8 CModernConfig::m_bExperimentalEdgeAA = 0;
-int8 CModernConfig::m_bDynamicPointLights = 0;
-int8 CModernConfig::m_bWetRoadReflections = 0;
-int8 CModernConfig::m_nRealtimeShadows = 0;
-
 void
 CModernConfig::ResetToClassicDefaults()
 {
@@ -77,14 +68,6 @@ CModernConfig::ResetToClassicDefaults()
 	m_bSwimming = 0;
 	m_bLedgeMantling = 0;
 	m_fMaxMantleHeight = 2.15f;
-
-	m_fLodDistMultiplier = 1.0f;
-	m_nNeonBloom = 0;
-	m_bFxaa = 0;
-	m_bExperimentalEdgeAA = 0;
-	m_bDynamicPointLights = 0;
-	m_bWetRoadReflections = 0;
-	m_nRealtimeShadows = 0;
 
 	ApplyFrameRateSettings();
 }
@@ -130,28 +113,11 @@ CModernConfig::ApplyPreset(int8 preset)
 		m_bLedgeMantling = 1;
 		m_fMaxMantleHeight = 2.15f;
 
-		m_fLodDistMultiplier = 1.0f;
-		m_nNeonBloom = 2;
-		m_bFxaa = 1;
-		m_bExperimentalEdgeAA = 0;
-		m_bDynamicPointLights = 1;
-		m_bWetRoadReflections = 1;
-		m_nRealtimeShadows = 1;
-
 		ApplyFrameRateSettings();
 	} else {
 		m_nPreset = MODERN_PRESET_CUSTOM;
 		ApplyFrameRateSettings();
 	}
-}
-
-void
-CModernConfig::OnMasterSwitchChanged(int8 before, int8 after)
-{
-	if (!before && after && m_nPreset == MODERN_PRESET_CLASSIC)
-		ApplyPreset(MODERN_PRESET_MODERN);
-	else
-		MarkCustomPresetIfNeeded();
 }
 
 void
@@ -200,20 +166,6 @@ CModernConfig::ClampValues()
 	m_bLedgeMantling = m_bLedgeMantling ? 1 : 0;
 	if (m_fMaxMantleHeight < 0.6f) m_fMaxMantleHeight = 0.6f;
 	if (m_fMaxMantleHeight > 4.0f) m_fMaxMantleHeight = 4.0f;
-
-	m_fLodDistMultiplier = ModernVisualPolicy::LodMultiplier(true, m_fLodDistMultiplier);
-	if (m_nNeonBloom < 0 || m_nNeonBloom > 2) m_nNeonBloom = 0;
-	m_bFxaa = m_bFxaa ? 1 : 0;
-	m_bExperimentalEdgeAA = m_bExperimentalEdgeAA ? 1 : 0;
-	m_bDynamicPointLights = m_bDynamicPointLights ? 1 : 0;
-	m_bWetRoadReflections = m_bWetRoadReflections ? 1 : 0;
-	if (m_nRealtimeShadows < 0 || m_nRealtimeShadows > 2) m_nRealtimeShadows = 0;
-}
-
-float
-CModernConfig::GetLodDistanceMultiplier()
-{
-	return ModernVisualPolicy::ActiveLodMultiplier(m_bMasterEnable != 0, m_fLodDistMultiplier);
 }
 
 int32

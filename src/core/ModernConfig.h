@@ -92,20 +92,8 @@ public:
 	static int8 m_bLedgeMantling;      // 0/1
 	static float m_fMaxMantleHeight;   // meters (default: 2.15f)
 
-	// Phase 6: Rendering, Lighting & World Visuals
-	static float m_fLodDistMultiplier; // legacy saved value; extended distance is suspended
-	static int8 m_nNeonBloom;          // 0 = Off, 1 = Low, 2 = High
-	static int8 m_bFxaa;               // 0/1
-	static int8 m_bExperimentalEdgeAA; // opt-in preview, not FXAA 3.11
-	static int8 m_bDynamicPointLights; // 0/1
-	static int8 m_bWetRoadReflections; // 0/1
-	static int8 m_nRealtimeShadows;    // 0 = Classic, 1 = Medium, 2 = High
-
 	static void ResetToClassicDefaults();
 	static void ApplyPreset(int8 preset);
-	// Called after the menu changes the master switch. Enabling directly from
-	// Classic activates the Modern preset; custom settings remain untouched.
-	static void OnMasterSwitchChanged(int8 before, int8 after);
 	static void MarkCustomPresetIfNeeded();
 	static void ClampValues();
 
@@ -114,9 +102,6 @@ public:
 	static bool ShouldFrameLimitGameplay();
 	static bool ShouldWaitVSyncInGameplay();
 	static void ApplyFrameRateSettings();
-
-	// Phase 6: currently returns 1.0 even for older saved extended-distance values.
-	static float GetLodDistanceMultiplier();
 
 	// Phase 1 (M1.1 / M1.2) runtime feature predicates
 	static bool IsHighFpsPhysicsFixEnabled() { return m_bMasterEnable != 0 && m_bHighFpsPhysicsFix != 0; }
