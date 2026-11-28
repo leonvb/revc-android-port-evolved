@@ -40,6 +40,8 @@ int main()
 	assert(ascii(text.Get("FEC_JPR")).size() > 40);
 #ifdef MODERN_FEATURES
 	assert(ascii(text.Get("FEM_TFP")) == "TARGET FPS");
+	assert(ascii(text.Get("FFR_RAT")) == "FRAME RATE");
+	assert(ascii(text.Get("FFR_UNC")) == "UNCAPPED");
 #endif
 #ifndef MASTER
 	assert(ascii(text.Get("UNKNOWN")) == "UNKNOWN missing");

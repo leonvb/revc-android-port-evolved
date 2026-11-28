@@ -1,7 +1,16 @@
 #include "common.h"
 #include "ModernConfig.h"
+#include "ModernFrameRate.h"
+#include <chrono>
 
 #ifdef MODERN_FEATURES
+
+static_assert((int)MODERN_FPS_30 == (int)ModernFrameRate::FPS30 &&
+	(int)MODERN_FPS_60 == (int)ModernFrameRate::FPS60 &&
+	(int)MODERN_FPS_90 == (int)ModernFrameRate::FPS90 &&
+	(int)MODERN_FPS_120 == (int)ModernFrameRate::FPS120 &&
+	(int)MODERN_FPS_NATIVE == (int)ModernFrameRate::UNCAPPED &&
+	(int)MODERN_FPS_COUNT == (int)ModernFrameRate::COUNT, "Frame rate save indices must remain stable");
 
 #include "Frontend.h"
 #include "Camera.h"
@@ -42,7 +51,7 @@ CModernConfig::IsModernAimActive()
 int8 CModernConfig::m_nPreset = MODERN_PRESET_CLASSIC;
 int8 CModernConfig::m_bMasterEnable = 0;
 
-int8 CModernConfig::m_nTargetFPS = MODERN_FPS_30;
+int8 CModernConfig::m_nFrameRate = MODERN_FPS_30;
 
 int8 CModernConfig::m_bHighFpsPhysicsFix = 0;
 int8 CModernConfig::m_nDrivingStyle = MODERN_DRIVING_CLASSIC;
@@ -73,8 +82,6 @@ CModernConfig::ResetToClassicDefaults()
 {
 	m_nPreset = MODERN_PRESET_CLASSIC;
 	m_bMasterEnable = 0;
-
-	m_nTargetFPS = MODERN_FPS_30;
 
 	m_bHighFpsPhysicsFix = 0;
 	m_nDrivingStyle = MODERN_DRIVING_CLASSIC;
@@ -114,8 +121,6 @@ CModernConfig::ApplyPreset(int8 preset)
 	if (preset == MODERN_PRESET_MODERN) {
 		m_nPreset = MODERN_PRESET_MODERN;
 		m_bMasterEnable = 1;
-
-		m_nTargetFPS = MODERN_FPS_60;
 
 		m_bHighFpsPhysicsFix = 1;
 		m_nDrivingStyle = MODERN_DRIVING_MODERN;
@@ -165,8 +170,8 @@ CModernConfig::ClampValues()
 		m_nPreset = MODERN_PRESET_CLASSIC;
 	m_bMasterEnable = m_bMasterEnable ? 1 : 0;
 
-	if (m_nTargetFPS < MODERN_FPS_30 || m_nTargetFPS >= MODERN_FPS_COUNT)
-		m_nTargetFPS = MODERN_FPS_30;
+	if (m_nFrameRate < MODERN_FPS_30 || m_nFrameRate >= MODERN_FPS_COUNT)
+		m_nFrameRate = MODERN_FPS_30;
 
 	m_bHighFpsPhysicsFix = m_bHighFpsPhysicsFix ? 1 : 0;
 	if (m_nDrivingStyle < MODERN_DRIVING_CLASSIC || m_nDrivingStyle > MODERN_DRIVING_MODERN)
@@ -205,43 +210,44 @@ CModernConfig::ClampValues()
 int32
 CModernConfig::GetTargetFpsValue()
 {
-	switch (m_nTargetFPS) {
-	case MODERN_FPS_30:
-		return 30;
-	case MODERN_FPS_60:
-		return 60;
-	case MODERN_FPS_90:
-		return 90;
-	case MODERN_FPS_120:
-		return 120;
-	case MODERN_FPS_NATIVE:
-	default:
-		return 0; // 0 = Native display refresh / uncapped by software timer
-	}
+	return ModernFrameRate::Hertz(m_nFrameRate);
 }
 
 bool
 CModernConfig::ShouldFrameLimitGameplay()
 {
-	if (!FrontEndMenuManager.m_PrefsFrameLimiter)
-		return false;
 	return GetTargetFpsValue() > 0;
+}
+
+static bool
+ModernFrameReady(int hz)
+{
+	static ModernFrameRate::Pacer pacer;
+	const int64_t now = std::chrono::duration_cast<std::chrono::nanoseconds>(
+		std::chrono::steady_clock::now().time_since_epoch()).count();
+	return pacer.Ready(now, hz);
+}
+
+bool
+CModernConfig::ShouldRenderFrame()
+{
+	return ModernFrameReady(ModernFrameRate::EffectiveHertz(m_nFrameRate, FrontEndMenuManager.m_bMenuActive));
+}
+
+bool
+CModernConfig::ShouldRenderMenuFrame()
+{
+	return ModernFrameReady(30);
 }
 
 bool
 CModernConfig::ShouldWaitVSyncInGameplay()
 {
-	if (!FrontEndMenuManager.m_PrefsFrameLimiter) {
-#ifdef LEGACY_MENU_OPTIONS
-		return FrontEndMenuManager.m_PrefsVsync != 0;
-#else
-		return false;
-#endif
-	}
 #ifdef LEGACY_MENU_OPTIONS
 	return FrontEndMenuManager.m_PrefsVsync != 0;
 #else
-	return true;
+	// On backends without a VSync setting retain their established behavior.
+	return GetTargetFpsValue() > 0;
 #endif
 }
 
@@ -249,14 +255,14 @@ void
 CModernConfig::ApplyFrameRateSettings()
 {
 	ClampValues();
-
 	int32 targetFps = GetTargetFpsValue();
-	RsGlobal.maxFPS = (targetFps > 0) ? targetFps : 240;
-
+	// Compatibility projection for old code/settings; never used as the
+	// authoritative gameplay limit in Modern builds.
+	FrontEndMenuManager.m_PrefsFrameLimiter = targetFps > 0;
+	RsGlobal.maxFPS = targetFps > 0 ? targetFps : 240;
 #if defined ANDROID
-	// When Frame Limiter is disabled in Graphics Setup, request native display refresh (0).
-	int32 displayHz = FrontEndMenuManager.m_PrefsFrameLimiter ? targetFps : 0;
-	CJavaWrapper::SetTargetRefreshRate(displayHz);
+	// A display mode request is only a hint, not a promise or software cap.
+	CJavaWrapper::SetTargetRefreshRate(targetFps);
 #endif
 }
 

@@ -2266,8 +2266,12 @@ main(int argc, char *argv[])
 					
 					case GS_FRONTEND:
 					{
-						if(!WindowIconified)
-							RsEventHandler(rsFRONTENDIDLE, nil);
+						if(!WindowIconified) {
+#ifdef MODERN_FEATURES
+							if (CModernConfig::ShouldRenderMenuFrame())
+#endif
+								RsEventHandler(rsFRONTENDIDLE, nil);
+						}
 
 #ifdef PS2_MENU
 						if ( !FrontEndMenuManager.m_bMenuActive || TheMemoryCard.m_bWantToLoad )
@@ -2330,11 +2334,13 @@ main(int argc, char *argv[])
 					
 					case GS_PLAYING_GAME:
 					{
+#ifndef MODERN_FEATURES
 						float ms = (float)CTimer::GetCurrentTimeInCycles() / (float)CTimer::GetCyclesPerMillisecond();
+#endif
 						if ( RwInitialised )
 						{
 #ifdef MODERN_FEATURES
-							if (!CModernConfig::ShouldFrameLimitGameplay() || (1000.0f / (float)RsGlobal.maxFPS) < ms)
+							if (CModernConfig::ShouldRenderFrame())
 #else
 							if (!FrontEndMenuManager.m_PrefsFrameLimiter || (1000.0f / (float)RsGlobal.maxFPS) < ms)
 #endif

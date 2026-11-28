@@ -102,6 +102,31 @@ only to supported third-person instant-hit and shotgun aim paths. OTS camera,
 strafing and aim assist require device validation.
 
 
+## Unified frame-rate setting
+
+```sh
+python3 tests/test_modern_frame_rate_contract.py
+c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=undefined \
+  tests/modern_frame_rate.cpp -o /tmp/modern_frame_rate
+/tmp/modern_frame_rate
+INCLUDES=$(find src -type d -printf ' -I%p')
+c++ -w -std=c++11 -fsanitize=undefined -ffunction-sections -fdata-sections \
+  -DRW_GL3 -DLIBRW_SDL2 -DLIBRW $INCLUDES -Ivendor/librw -Ivendor/sdl2/include \
+  tests/modern_frame_rate_config.cpp src/core/ModernConfig.cpp \
+  -Wl,--gc-sections -o /tmp/modern_frame_rate_config
+/tmp/modern_frame_rate_config
+```
+
+Tests cover strict parsing, canonical/legacy precedence, invalid and missing
+settings, actual INI read/write/restart and downgrade projections, independent
+VSync preservation, and synthetic 30/60/90/120/uncapped deadline pacing,
+stalls, rate changes and clock resets. The real configuration class is linked
+against minimal frontend stubs to exercise presets, VSync and effective limits.
+Source contracts check menu placement,
+callbacks, preset independence, backends and Android refresh reapplication.
+They do not measure real rendering, display/VSync limits, Android lifecycle or
+CPU use; test those on devices with the actual game assets.
+
 ## Modern aim magnetism
 
 ```sh

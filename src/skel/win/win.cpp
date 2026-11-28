@@ -2426,8 +2426,12 @@ WinMain(HINSTANCE instance,
 					{
 						GetWindowPlacement(PSGLOBAL(window), &wp);
 						
-						if (wp.showCmd != SW_SHOWMINIMIZED)
-							RsEventHandler(rsFRONTENDIDLE, nil);
+						if (wp.showCmd != SW_SHOWMINIMIZED) {
+#ifdef MODERN_FEATURES
+							if (CModernConfig::ShouldRenderMenuFrame())
+#endif
+								RsEventHandler(rsFRONTENDIDLE, nil);
+						}
 
 #ifdef PS2_MENU
 						if ( !FrontEndMenuManager.m_bMenuActive || TheMemoryCard.m_bWantToLoad )
@@ -2490,11 +2494,13 @@ WinMain(HINSTANCE instance,
 					
 					case GS_PLAYING_GAME:
 					{
+#ifndef MODERN_FEATURES
 						float ms = (float)CTimer::GetCurrentTimeInCycles() / (float)CTimer::GetCyclesPerMillisecond();
+#endif
 						if ( RwInitialised )
 						{
 #ifdef MODERN_FEATURES
-							if (!CModernConfig::ShouldFrameLimitGameplay() || (1000.0f / (float)RsGlobal.maxFPS) < ms)
+							if (CModernConfig::ShouldRenderFrame())
 #else
 							if (!FrontEndMenuManager.m_PrefsFrameLimiter || (1000.0f / (float)RsGlobal.maxFPS) < ms)
 #endif

@@ -199,6 +199,8 @@ LookupFrontendFallbackText(const char *key)
 		{ "FEM_MPR", "MODERN PRESET" },
 		{ "FEM_MMA", "MODERN FEATURES" },
 		{ "FEM_TFP", "TARGET FPS" },
+		{ "FFR_RAT", "FRAME RATE" },
+		{ "FFR_UNC", "UNCAPPED" },
 		{ "FEM_HFP", "HIGH FPS PHYSICS FIX" },
 		{ "FEM_DRV", "DRIVING DYNAMICS" },
 		{ "FEM_MAC", "MID-AIR CAR CONTROL" },

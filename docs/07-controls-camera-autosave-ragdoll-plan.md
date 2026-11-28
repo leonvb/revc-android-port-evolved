@@ -116,6 +116,32 @@ excludes neutral bystanders.
 
 ## M4 — One FPS selector and migration
 
+**Implementation:** the Graphics/Display page contains the only frame-rate
+selector: 30, 60, 90, 120 or Uncapped. It is independent of gameplay presets.
+Uncapped means no software gameplay cap, not a guarantee of panel refresh;
+VSync and the Android compositor/display may limit output. Existing menu VSync
+behavior remains unchanged. Graphics restore defaults resets the selection to
+30; restoring Modern gameplay defaults leaves it alone.
+
+`[Graphics] FrameRate` is the canonical versioned-by-key selector: integer
+indices 0–4 correspond to the five choices above. On upgrade a valid canonical
+key wins; otherwise a legacy disabled `FrameLimiter` means Uncapped, otherwise
+the old `[Modern] TargetFPS` index is used (including old Native → Uncapped),
+otherwise 30. Parsing rejects invalid or overflowing numeric values. The old
+keys are written as derived compatibility projections, not independent runtime
+controls; older versions can read the nearest equivalent on downgrade. The
+VSync preference is never part of migration. The initial migration writes the
+new key into the existing INI; if storage is unavailable persistence cannot be
+guaranteed and it will be retried at next launch.
+
+Gameplay pacing uses monotonic high-resolution deadlines in SDL, GLFW and the
+Windows backend, while Android display-mode requests are hints and are reapplied
+on focus/resume. Frontend and pause menus use a temporary 30 FPS software cap
+and their existing VSync policy; neither changes the stored selection. Host
+migration and synthetic pacing tests and build checks do not establish real hardware pacing or lifecycle behavior: cold start,
+main/pause menu, graphics reset, upgrade/downgrade, background/resume and
+VSync-on/off still require actual Android and desktop testing.
+
 1. Use a single visible **Frame rate** selector in Graphics/Display (according to the actual frontend layout): `30 / 60 / 90 / 120 / Uncapped`. Remove the duplicate Modernization target and the separate on/off limiter entry from the same user flow. Specify `Uncapped` as **no software gameplay cap**; display refresh and VSync remain separate and may still limit output. Retain a separate VSync control where supported and do not promise that the OS display runs at any requested rate.
 2. Make a single canonical persisted value and make desktop SDL/GLFW/Windows pacing, Android refresh hints, menus and graphics reset read the same effective state. Modern/Classic gameplay presets must not silently change the global FPS selection. Keep a safe 30-FPS/menu policy where required without changing the player's stored choice.
 3. Version/precedence for one-time migration: if a valid new canonical key exists, use it; otherwise if legacy `[Graphics] FrameLimiter` is off use Uncapped; otherwise translate valid `[Modern] TargetFPS` (30/60/90/120, Native → Uncapped); on missing/invalid values use the old effective default, 30. Preserve independent VSync behavior. Write the new key, read old keys for backward compatibility but do not maintain contradictory live values; test upgrading files with both keys and downgrading where feasible. Do not reinterpret the old `Native` option as a guaranteed hardware-native frame cap.
