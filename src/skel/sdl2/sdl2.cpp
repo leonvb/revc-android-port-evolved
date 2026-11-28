@@ -2045,19 +2045,24 @@ void CapturePad(RwInt32 padID)
     ControlsManager.m_NewState.id = joyId;
     ControlsManager.m_NewState.isGamepad = true; // SDL_IsGameController(joyId);
 
+#if defined(MODERN_FEATURES) && defined(GTA_PC_CONTROLS)
+    const bool hasTriggers = SDL_GameControllerGetBindForAxis(gamepad, SDL_CONTROLLER_AXIS_TRIGGERLEFT).bindType != SDL_CONTROLLER_BINDTYPE_NONE &&
+        SDL_GameControllerGetBindForAxis(gamepad, SDL_CONTROLLER_AXIS_TRIGGERRIGHT).bindType != SDL_CONTROLLER_BINDTYPE_NONE;
+    const float leftTrigger = SDL_GameControllerGetAxis(gamepad, SDL_CONTROLLER_AXIS_TRIGGERLEFT) / 32767.0f;
+    const float rightTrigger = SDL_GameControllerGetAxis(gamepad, SDL_CONTROLLER_AXIS_TRIGGERRIGHT) / 32767.0f;
+    const bool modernPedals = hasTriggers && WindowFocused && !WindowIconified && CPad::WantsModernVehiclePedals();
+    // Do not send the same trigger to old remappable look/weapon actions
+    // when it is being used as a pedal.
+    ControlsManager.m_NewState.mappedButtons[15] = !modernPedals && leftTrigger > 0.1f;
+    ControlsManager.m_NewState.mappedButtons[16] = !modernPedals && rightTrigger > 0.1f;
+#else
     if (ControlsManager.m_NewState.isGamepad) {
-        // TRIGGERLEFT/RIGHT are in range 0..32767, which needs to be converted to -1 (released) .. 1 (pressed)
         float lt = (SDL_GameControllerGetAxis(gamepad, SDL_CONTROLLER_AXIS_TRIGGERLEFT) - 16384.0) / 16384.0;
         float rt = (SDL_GameControllerGetAxis(gamepad, SDL_CONTROLLER_AXIS_TRIGGERRIGHT) - 16384.0) / 16384.0;
-
-        // glfw returns 0.0 for non-existent axises(which is bullocks) so we treat it as deadzone, and keep value of previous frame.
-        // otherwise if this axis is present, -1 = released, 1 = pressed
-        if (lt != 0.0f)
-            ControlsManager.m_NewState.mappedButtons[15] = lt > -0.8f;
-
-        if (rt != 0.0f)
-            ControlsManager.m_NewState.mappedButtons[16] = rt > -0.8f;
+        if (lt != 0.0f) ControlsManager.m_NewState.mappedButtons[15] = lt > -0.8f;
+        if (rt != 0.0f) ControlsManager.m_NewState.mappedButtons[16] = rt > -0.8f;
     }
+#endif
     // TODO? L2-R2 axes(not buttons-that's fine) on joysticks that don't have SDL gamepad mapping AREN'T handled, and I think it's impossible to do without mapping.
 
     if (ControlsManager.m_bFirstCapture == true) {
@@ -2091,6 +2096,9 @@ void CapturePad(RwInt32 padID)
             bs.padID = 1;
 
         CPad *pad = CPad::GetPad(bs.padID);
+#if defined(MODERN_FEATURES) && defined(GTA_PC_CONTROLS)
+        if (modernPedals) pad->SetModernVehiclePedals(leftTrigger, rightTrigger);
+#endif
 
         if (Abs(leftStickPos.x)  > ControlsManager.m_lStickDeadzone)
             pad->PCTempJoyState.LeftStickX	= (int32)(leftStickPos.x  * 128.0f * ControlsManager.m_lStickSensX);

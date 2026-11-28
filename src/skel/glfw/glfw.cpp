@@ -2487,6 +2487,13 @@ RwV2d rightStickPos;
 
 void CapturePad(RwInt32 padID)
 {
+#if defined(MODERN_FEATURES) && defined(GTA_PC_CONTROLS)
+	// GLFW reports 0 for a missing gamepad axis, which is also a real
+	// trigger midpoint. Require each trigger to have reported a nonzero
+	// value before interpreting its midpoint; reset on disconnect/device swap.
+	struct TriggerCapability { int id; bool left, right; };
+	static TriggerCapability capabilities[2] = {{-1, false, false}, {-1, false, false}};
+#endif
 	int8 glfwPad = -1;
 
 	if( padID == 0 )
@@ -2496,8 +2503,18 @@ void CapturePad(RwInt32 padID)
 	else
 		assert("invalid padID");
 	
-	if ( glfwPad == -1 )
+	if ( glfwPad == -1 ) {
+#if defined(MODERN_FEATURES) && defined(GTA_PC_CONTROLS)
+		if (padID >= 0 && padID < 2) capabilities[padID] = TriggerCapability{-1, false, false};
+#endif
 		return;
+	}
+#if defined(MODERN_FEATURES) && defined(GTA_PC_CONTROLS)
+	TriggerCapability &capability = capabilities[padID];
+	if (capability.id != glfwPad) capability = TriggerCapability{glfwPad, false, false};
+	bool modernPedals = false;
+	float leftTrigger = 0.0f, rightTrigger = 0.0f;
+#endif
 	
 	int numButtons, numAxes;
 	const uint8 *buttons = glfwGetJoystickButtons(glfwPad, &numButtons);
@@ -2518,7 +2535,15 @@ void CapturePad(RwInt32 padID)
 	if (ControlsManager.m_NewState.isGamepad) {
 		memcpy(&ControlsManager.m_NewState.mappedButtons, gamepadState.buttons, sizeof(gamepadState.buttons));
 		float lt = gamepadState.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER], rt = gamepadState.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER];
-
+#if defined(MODERN_FEATURES) && defined(GTA_PC_CONTROLS)
+		if (lt != 0.0f) capability.left = true;
+		if (rt != 0.0f) capability.right = true;
+		leftTrigger = (lt + 1.0f) * 0.5f;
+		rightTrigger = (rt + 1.0f) * 0.5f;
+		modernPedals = capability.left && capability.right && WindowFocused && !WindowIconified && CPad::WantsModernVehiclePedals();
+		ControlsManager.m_NewState.mappedButtons[15] = !modernPedals && capability.left && leftTrigger > 0.1f;
+		ControlsManager.m_NewState.mappedButtons[16] = !modernPedals && capability.right && rightTrigger > 0.1f;
+#else
 		// glfw returns 0.0 for non-existent axises(which is bullocks) so we treat it as deadzone, and keep value of previous frame.
 		// otherwise if this axis is present, -1 = released, 1 = pressed
 		if (lt != 0.0f)
@@ -2526,6 +2551,7 @@ void CapturePad(RwInt32 padID)
 
 		if (rt != 0.0f)
 			ControlsManager.m_NewState.mappedButtons[16] = rt > -0.8f;
+#endif
 	}
 	// TODO? L2-R2 axes(not buttons-that's fine) on joysticks that don't have SDL gamepad mapping AREN'T handled, and I think it's impossible to do without mapping.
 
@@ -2563,6 +2589,9 @@ void CapturePad(RwInt32 padID)
 			bs.padID = 1;
 		
 		CPad *pad = CPad::GetPad(bs.padID);
+#if defined(MODERN_FEATURES) && defined(GTA_PC_CONTROLS)
+		if (modernPedals) pad->SetModernVehiclePedals(leftTrigger, rightTrigger);
+#endif
 
 		if ( Abs(leftStickPos.x)  > 0.3f )
 			pad->PCTempJoyState.LeftStickX	= (int32)(leftStickPos.x  * 128.0f);

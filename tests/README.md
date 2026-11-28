@@ -126,3 +126,33 @@ cap and a generic collision probe are not sufficient to guarantee mission and
 island gating, especially because swimming itself could go around a bridge.
 Those features require a reliable way to enforce script-controlled access and
 playtesting with the original game assets before they can be enabled safely.
+
+## Analog vehicle trigger groundwork (partial fixed-controller milestone)
+
+```sh
+python3 tests/test_modern_pedals_contract.py
+c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=undefined \
+  tests/modern_pedal_input.cpp -o /tmp/modern_pedal_input
+/tmp/modern_pedal_input
+INCLUDES=$(find src -type d -printf ' -I%p')
+c++ -w -std=c++11 -ffunction-sections -fdata-sections \
+  -DRW_GL3 -DLIBRW_SDL2 -DLIBRW $INCLUDES -Ivendor/librw -Ivendor/sdl2/include \
+  tests/modern_pedal_reconcile.cpp src/core/Pad.cpp -Wl,--gc-sections -o /tmp/modern_pedal_reconcile
+/tmp/modern_pedal_reconcile
+```
+
+These exercise trigger normalization, deadzone, independent pedal pressures,
+keyboard/mouse combination and the actual input reconciliation behavior. The
+source-contract test checks wiring, not gameplay. Physical SDL controllers with
+both mapped triggers, mapped GLFW gamepads once both trigger axes are observed,
+and XInput have trigger pedals while driving. Devices without confirmed trigger
+axes fall back to the existing controls; Android touch is unchanged. The rest of
+the fixed modern, non-remappable layout and its frontend prompts is **not yet
+implemented**. These changes have not been tested with physical controllers.
+
+For device testing: in a car and bike, compare light, half and full RT travel,
+then use LT to brake and reverse; check holding both triggers, stopping on a hill,
+releasing, controller disconnect/reconnect and keyboard/touch controls. Also
+check boats, aircraft, drive-bys and camera look controls. The pedal command is
+proportional; the resulting vehicle speed is not expected to be linear in pedal
+travel. Record the device/controller and backend for any unexpected behavior.
