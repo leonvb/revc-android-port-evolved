@@ -206,6 +206,11 @@ public:
 #ifdef GTA_PS2_STUFF
 	static void Initialise(void);
 #endif
+#if defined(MODERN_FEATURES) && defined(GTA_PC_CONTROLS)
+	// Transient input state only; does not alter CPad's serialized layout.
+	static bool WantsModernVehiclePedals();
+	void SetModernVehiclePedals(float brake, float throttle);
+#endif
 	void Clear(bool bResetPlayerControls);
 	void ClearMouseHistory();
 	void ClearKeyBoardHistory();

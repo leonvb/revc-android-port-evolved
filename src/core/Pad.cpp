@@ -2,6 +2,7 @@
 #include "common.h"
 #ifdef MODERN_FEATURES
 #include "ModernWheels.h"
+#include "ModernPedalInput.h"
 #endif
 #include "crossplatform.h"
 #include "platform.h"
@@ -29,6 +30,8 @@
 #include "World.h"
 #include "Vehicle.h"
 #include "Ped.h"
+#include "PlayerPed.h"
+#include "PlayerInfo.h"
 #include "Population.h"
 #include "Record.h"
 #include "Replay.h"
@@ -51,6 +54,35 @@
 #endif
 
 CPad Pads[MAX_PADS];
+#if defined(MODERN_FEATURES) && defined(GTA_PC_CONTROLS)
+namespace {
+struct ModernPedals { bool active; int brake, throttle; };
+ModernPedals modernPedals[MAX_PADS] = {};
+}
+
+bool CPad::WantsModernVehiclePedals()
+{
+	CPlayerPed *player = FindPlayerPed();
+	return player && player->m_nPedState == PED_DRIVING && FindPlayerVehicle() &&
+		!FrontEndMenuManager.GetIsMenuActive() && !CTimer::GetIsPaused() &&
+		!CReplay::IsPlayingBack() && !CRecordDataForGame::IsPlayingBack() &&
+		!CPad::GetPad(0)->ArePlayerControlsDisabled();
+}
+
+void CPad::SetModernVehiclePedals(float brake, float throttle)
+{
+	int index = this == &Pads[0] ? 0 : this == &Pads[1] ? 1 : -1;
+	if (index < 0 || !WantsModernVehiclePedals()) return;
+	ModernPedals &input = modernPedals[index];
+	input.active = true;
+	input.brake = ModernPedalInput::Pedal(brake);
+	input.throttle = ModernPedalInput::Pedal(throttle);
+	// Replace joystick face-button pedal bindings only; keyboard/mouse and
+	// Android's virtual touch pad still use their separate input states.
+	PCTempJoyState.Cross = input.throttle;
+	PCTempJoyState.Square = input.brake;
+}
+#endif
 #ifdef GTA_PS2
 u_long128 pad_dma_buf[scePadDmaBufferMax] __attribute__((aligned(64)));
 u_long128 pad2_dma_buf[scePadDmaBufferMax] __attribute__((aligned(64)));
@@ -744,6 +776,10 @@ void CPad::Initialise(void)
 
 void CPad::Clear(bool bResetPlayerControls)
 {
+#if defined(MODERN_FEATURES) && defined(GTA_PC_CONTROLS)
+	int modernIndex = this == &Pads[0] ? 0 : this == &Pads[1] ? 1 : -1;
+	if (modernIndex >= 0) modernPedals[modernIndex] = ModernPedals();
+#endif
 	NewState.Clear();
 	OldState.Clear();
 
@@ -1640,6 +1676,13 @@ void CPad::AffectFromXinput(uint32 pad)
 		PCTempJoyState.RightShock = (xstate.Gamepad.wButtons & XINPUT_GAMEPAD_RIGHT_THUMB) ? 255 : 0;
 		PCTempJoyState.RightShoulder1 = (xstate.Gamepad.wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER) ? 255 : 0;
 		PCTempJoyState.RightShoulder2 = xstate.Gamepad.bRightTrigger;
+#if defined(MODERN_FEATURES) && defined(GTA_PC_CONTROLS)
+		if (WantsModernVehiclePedals()) {
+			PCTempJoyState.LeftShoulder2 = PCTempJoyState.RightShoulder2 = 0;
+			SetModernVehiclePedals(xstate.Gamepad.bLeftTrigger / 255.0f,
+				xstate.Gamepad.bRightTrigger / 255.0f);
+		}
+#endif
 
 		PCTempJoyState.Select = (xstate.Gamepad.wButtons & XINPUT_GAMEPAD_BACK) ? 255 : 0;
 #ifdef REGISTER_START_BUTTON
@@ -1683,6 +1726,9 @@ void CPad::AffectFromXinput(uint32 pad)
 
 void CPad::UpdatePads(void)
 {
+#if defined(MODERN_FEATURES) && defined(GTA_PC_CONTROLS)
+	for (int i = 0; i < MAX_PADS; ++i) modernPedals[i] = ModernPedals();
+#endif
 #ifndef GTA_PC_CONTROLS
 	Pads[0].Update(0);
 #ifndef MASTER
@@ -2057,6 +2103,14 @@ void CPad::Update(int16 pad)
 	{
 		NewState = ReconcileTwoControllersInput(PCTempKeyState, PCTempJoyState);
 		NewState = ReconcileTwoControllersInput(PCTempMouseState, NewState);
+#if defined(MODERN_FEATURES)
+		// ReconcileTwoControllersInput deliberately digitalizes buttons.
+		// Restore the actual pedal pressures after both reconciliation passes.
+		if (pad >= 0 && pad < MAX_PADS && modernPedals[pad].active) {
+			NewState.Cross = ModernPedalInput::Combine(modernPedals[pad].throttle, PCTempKeyState.Cross, PCTempMouseState.Cross);
+			NewState.Square = ModernPedalInput::Combine(modernPedals[pad].brake, PCTempKeyState.Square, PCTempMouseState.Square);
+		}
+#endif
 	}
 
 	PCTempJoyState.Clear();
@@ -2630,6 +2684,11 @@ int16 CPad::GetBrake(void)
 {
 	if ( ArePlayerControlsDisabled() )
 		return 0;
+#if defined(MODERN_FEATURES) && defined(GTA_PC_CONTROLS)
+	int modernIndex = this == &Pads[0] ? 0 : this == &Pads[1] ? 1 : -1;
+	if (modernIndex >= 0 && modernPedals[modernIndex].active)
+		return NewState.Square;
+#endif
 
 	switch (CURMODE)
 	{
@@ -2795,6 +2854,11 @@ int16 CPad::GetAccelerate(void)
 {
 	if ( ArePlayerControlsDisabled() )
 		return 0;
+#if defined(MODERN_FEATURES) && defined(GTA_PC_CONTROLS)
+	int modernIndex = this == &Pads[0] ? 0 : this == &Pads[1] ? 1 : -1;
+	if (modernIndex >= 0 && modernPedals[modernIndex].active)
+		return NewState.Cross;
+#endif
 
 	switch (CURMODE)
 	{
