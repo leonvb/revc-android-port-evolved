@@ -5,6 +5,10 @@ GL/GLES and D3D9. `[Modern] FXAA` selects FXAA; the old experimental edge AA
 remains an independently selectable fallback and is not FXAA. If both are
 selected, FXAA takes precedence. `[Modern] NeonBloom` has Off, Low and High
 settings. The Modern preset selects FXAA and High bloom; Classic selects off.
+Turning the master switch on while the preset is Classic now applies the full
+Modern preset (including its non-visual settings). Switching it back on from a
+Custom preset preserves the user's selections. Existing Custom configurations
+are not automatically migrated; select the Modern preset to reset them.
 See `docs/fxaa-third-party.md` for FXAA provenance and binary notices.
 
 Bloom captures after motion blur and before HUD, extracts highlights into a
@@ -20,8 +24,11 @@ ends each scene before beginning the next; GL checks FBO completeness.
 
 The scene copy path currently uses camera-raster dimensions at reduced GL/SDL
 render scale. Both modern effects skip at reduced scale; other existing effects
-may still use the copy path. Unsupported shader models, unavailable shaders,
-invalid capture bounds and failed target creation bypass the new effects.
+may still use the copy path. When the scene camera changes size, PostFX
+buffers are reopened even if legacy motion blur is disabled; the effect of
+this change on Android depends on whether a resize occurs after initial setup.
+Unsupported shader models, unavailable shaders, invalid capture bounds and
+failed target creation bypass the new effects.
 The budget estimates tightly packed RGBA8 memory, not actual driver allocation.
 
 ## Evidence and remaining checks

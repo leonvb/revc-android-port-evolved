@@ -1,5 +1,6 @@
 const char *modernWorld_vert_src =
 "VSIN(ATTRIB_POS) vec3 in_pos;\n"
+"uniform vec4 u_modernOptions; // wetness, env available, has vertex normals, unused\n"
 "VSOUT vec4 v_color;\n"
 "VSOUT vec2 v_tex0;\n"
 "VSOUT vec2 v_tex1;\n"
@@ -10,7 +11,9 @@ const char *modernWorld_vert_src =
 "{\n"
 "    vec4 vertex = u_world * vec4(in_pos, 1.0);\n"
 "    gl_Position = u_proj * u_view * vertex;\n"
-"    vec3 normal = mat3(u_world) * in_normal;\n"
+"    vec3 normal = vec3(0.0);\n"
+"    if(u_modernOptions.z > 0.5)\n"
+"        normal = mat3(u_world) * in_normal;\n"
 "    v_worldPos = vertex.xyz;\n"
 "    v_worldNormal = normal;\n"
 "    v_tex0 = in_tex0;\n"

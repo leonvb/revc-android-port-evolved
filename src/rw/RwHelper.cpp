@@ -6,6 +6,10 @@
 #include "skeleton.h"
 #include "Debug.h"
 #include "MBlur.h"
+#ifdef EXTENDED_COLOURFILTER
+#include "postfx.h"
+#include "main.h"
+#endif
 #if !defined(FINAL) || defined(DEBUGMENU)
 #include "rtcharse.h"
 #endif
@@ -583,10 +587,17 @@ CameraSize(RwCamera * camera, RwRect * rect,
 			raster->height = zRaster->height = rect->h;
 #endif
 #ifdef FIX_BUGS
+#ifdef EXTENDED_COLOURFILTER
+			// PostFX also owns the Modern bloom/AA buffers, independently of
+			// the legacy motion-blur toggle. Keep them sized to the scene.
+			if(camera == Scene.camera && (CPostFX::pFrontBuffer || CPostFX::pBackBuffer))
+				CPostFX::Open(camera);
+#else
 			if(CMBlur::BlurOn){
 				CMBlur::MotionBlurClose();
 				CMBlur::MotionBlurOpen(camera);
 			}
+#endif
 #endif
 		}
 

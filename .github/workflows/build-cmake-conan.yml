@@ -41,6 +41,7 @@ jobs:
           /tmp/modern_visual_policy
           python3 tests/test_priority_scan_contract.py
           python3 tests/test_radar_distance_contract.py
+          python3 tests/test_modern_render_contract.py
           python3 tests/test_scene_load_contract.py
           INCLUDES=$(find src -type d -printf ' -I%p')
           c++ -w -std=c++11 -fsanitize=undefined -ffunction-sections -fdata-sections \

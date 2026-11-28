@@ -146,6 +146,15 @@ CModernConfig::ApplyPreset(int8 preset)
 }
 
 void
+CModernConfig::OnMasterSwitchChanged(int8 before, int8 after)
+{
+	if (!before && after && m_nPreset == MODERN_PRESET_CLASSIC)
+		ApplyPreset(MODERN_PRESET_MODERN);
+	else
+		MarkCustomPresetIfNeeded();
+}
+
+void
 CModernConfig::MarkCustomPresetIfNeeded()
 {
 	m_nPreset = MODERN_PRESET_CUSTOM;
