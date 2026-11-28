@@ -17,4 +17,17 @@ assert 'Process_FollowCar_SA' in mode and 'Process_Cam_On_A_String' in mode
 follow = cam.split('CCam::Process_FollowCar_SA(', 1)[1]
 assert 'UseModernVehicleFollowCam(car)' in follow
 assert 'modernVehicleCamera && nextDirectionIsForward' in follow
+for guard in ('state.UpdateYaw(', 'yawAllowed', '!ResetStatics',
+              '!TheCamera.m_bCamDirectlyBehind', '!TheCamera.m_bCamDirectlyInFront',
+              '!TheCamera.m_bJustCameOutOfGarage', '!CTimer::GetIsPaused()',
+              'Mode == MODE_CAM_ON_A_STRING', 'this == &TheCamera.Cams[TheCamera.ActiveCam]',
+              'lastVehicle[camIndex] != car', 'lastFrame[camIndex] + 1',
+              'state.HoldingManualOrbit()', 'yawAllowed && !manualInput', 'lastModernSourceValid[camIndex]',
+              'modernSweepBlocked[camIndex]',
+              'ProcessLineOfSight(lastModernSource[camIndex], Source',
+              'MODERN_VEHICLE_CAMERA_TRACE'):
+    assert guard in follow, f'missing yaw integration guard: {guard}'
+assert 'targetBeta = Beta + difference * state.reverseWiden' not in follow
+assert 'Beta = modernYaw' in follow
+assert '&& !modernVehicleCamera' in follow
 print('modern vehicle camera eligibility and classic fallback checks passed')

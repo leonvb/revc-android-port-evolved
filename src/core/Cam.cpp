@@ -5031,15 +5031,21 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 #ifdef MODERN_FEATURES
 	// Only normal player-controlled road vehicles; never alter scripted, remote,
 	// aircraft, boat, tank or firetruck camera controls.
-	bool modernVehicleCamera = UseModernVehicleFollowCam(car);
+	bool modernVehicleCamera = Mode == MODE_CAM_ON_A_STRING && UseModernVehicleFollowCam(car);
 	static ModernVehicleCameraState modernState[3];
 	static const CVehicle *lastVehicle[3] = { nil, nil, nil };
 	static uint32 lastFrame[3] = { 0, 0, 0 };
+	static CVector lastModernSource[3];
+	static bool lastModernSourceValid[3] = { false, false, false };
+	static bool modernSweepBlocked[3] = { false, false, false };
 	const int camIndex = this - TheCamera.Cams;
 	ModernVehicleCameraState &state = modernState[camIndex];
 	if (!modernVehicleCamera || ResetStatics || lastVehicle[camIndex] != car ||
-	    lastFrame[camIndex] + 1 != CTimer::GetFrameCounter())
+	    lastFrame[camIndex] + 1 != CTimer::GetFrameCounter()) {
 		state.Reset(DefaultFOV);
+		lastModernSourceValid[camIndex] = false;
+		modernSweepBlocked[camIndex] = false;
+	}
 	lastVehicle[camIndex] = modernVehicleCamera ? car : nil;
 	lastFrame[camIndex] = CTimer::GetFrameCounter();
 #endif
@@ -5174,6 +5180,18 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 		if (DirectionWasLooking != LOOKING_FORWARD)
 			TheCamera.m_bCamDirectlyBehind = true;
 
+#ifdef MODERN_FEATURES
+	// Explicit look directions and camera resets retain the original behavior.
+	// Do not start an automatic transition on the same frame as a forced view.
+	bool yawAllowed = modernVehicleCamera && this == &TheCamera.Cams[TheCamera.ActiveCam] &&
+		nextDirectionIsForward && !ResetStatics &&
+		!TheCamera.m_bCamDirectlyBehind && !TheCamera.m_bCamDirectlyInFront &&
+		!TheCamera.m_bJustCameOutOfGarage && !pad->ArePlayerControlsDisabled() && !CTimer::GetIsPaused();
+	if (!yawAllowed) {
+		lastModernSourceValid[camIndex] = false;
+		modernSweepBlocked[camIndex] = false;
+	}
+#endif
 	// Called when we just entered the car, just started to look behind or returned back from looking left, right or behind
 	if (ResetStatics || TheCamera.m_bCamDirectlyBehind || TheCamera.m_bCamDirectlyInFront) {
 		ResetStatics = false;
@@ -5361,9 +5379,17 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 			AlphaSpeed = 0.0;
 			xMovement = mouseX * FOV / 80.0f * TheCamera.m_fMouseAccelHorzntl;
 			targetAlpha = Alpha;
+#ifdef MODERN_FEATURES
+			stepsLeftToChangeBetaByMouse = modernVehicleCamera ? 0.0f : 1.0f * 50.0f;
+#else
 			stepsLeftToChangeBetaByMouse = 1.0f * 50.0f;
+#endif
 			mouseChangesBeta = true;
-		} else if (stepsLeftToChangeBetaByMouse > 0.0f) {
+		} else if (stepsLeftToChangeBetaByMouse > 0.0f
+#ifdef MODERN_FEATURES
+		           && !modernVehicleCamera
+#endif
+		           ) {
 			// Finish rotation by decreasing speed when we stopped moving mouse
 			BetaSpeed = 0.0;
 			AlphaSpeed = 0.0;
@@ -5377,8 +5403,11 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 #endif
 
 #ifdef MODERN_FEATURES
+	bool modernYawActive = false;
+	bool manualInput = false;
+	float modernYaw = Beta;
 	if (modernVehicleCamera) {
-		bool manualInput = nextDirectionIsForward && !pad->ArePlayerControlsDisabled() &&
+		manualInput = nextDirectionIsForward && !pad->ArePlayerControlsDisabled() &&
 			(Abs(stickX) > 10.0f || Abs(stickY) > 10.0f);
 #ifdef GTA_PC_CONTROLS
 		manualInput = manualInput || (nextDirectionIsForward && !pad->ArePlayerControlsDisabled() &&
@@ -5391,11 +5420,9 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 			car->pHandling ? car->pHandling->Transmission.fMaxVelocity : 0.0f, DefaultFOV,
 			car->GetForward().z);
 		FOV = state.fov;
-		if (nextDirectionIsForward && !state.HoldingManualOrbit() && state.reverseWiden > 0.01f) {
-			float reverseHeading = car->GetForward().Heading() - HALFPI + PI;
-			float difference = CGeneral::LimitRadianAngle(reverseHeading - Beta);
-			targetBeta = Beta + difference * state.reverseWiden;
-		}
+		modernYawActive = state.UpdateYaw(CTimer::GetTimeStepInSeconds(),
+			DotProduct(car->GetForward(), car->m_vecMoveSpeed),
+			car->GetForward().Heading() - HALFPI, Beta, yawAllowed && !manualInput, modernYaw);
 		if (state.HoldingManualOrbit()) {
 			targetBeta = Beta;
 			targetAlpha = Alpha;
@@ -5436,6 +5463,22 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 	else
 		betaChangePerFrame = CTimer::GetTimeStep() * BetaSpeed;
 	Beta = betaChangePerFrame + Beta;
+#if defined(MODERN_FEATURES) && defined(MODERN_VEHICLE_CAMERA_TRACE)
+	float legacyCandidateYaw = Beta;
+#endif
+#ifdef MODERN_FEATURES
+	if (modernYawActive) {
+		Beta = modernYaw;
+		BetaSpeed = 0.0f; // do not carry the legacy follower's angular momentum
+	}
+#ifdef MODERN_VEHICLE_CAMERA_TRACE
+	if (modernVehicleCamera)
+		debug("modern vehicle yaw frame=%u dt=%.4f speed=%.4f phase=%d yaw=%.4f legacyCandidate=%.4f heading=%.4f yawRate=%.4f active=%d manual=%.3f\n",
+			CTimer::GetFrameCounter(), CTimer::GetTimeStepInSeconds(), DotProduct(car->GetForward(), car->m_vecMoveSpeed),
+			(int)state.yawPhase, Beta, legacyCandidateYaw, car->GetForward().Heading() - HALFPI,
+			state.yawVelocity, modernYawActive, state.manualHold);
+#endif
+#endif
 
 	if (TheCamera.m_bJustCameOutOfGarage) {
 		float invHeading = Atan2(Front.y, Front.x);
@@ -5552,6 +5595,27 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 		CColPoint colPoint;
 		CEntity* entity;
 		CWorld::pIgnoreEntity = CamTargetEntity;
+#ifdef MODERN_FEATURES
+		// The normal target-to-camera ray clips the final position, but a
+		// fast orbit can cross a thin wall between two clear endpoints. Sweep
+		// the visible source as well while the automatic yaw owns the camera.
+		if (modernVehicleCamera && yawAllowed && !manualInput && !state.HoldingManualOrbit() &&
+		    (modernYawActive || modernSweepBlocked[camIndex]) && lastModernSourceValid[camIndex]) {
+			float sweepDistanceSq = (Source - lastModernSource[camIndex]).MagnitudeSqr();
+			if (sweepDistanceSq > 0.000001f && sweepDistanceSq < sq(20.0f)) {
+				CColPoint sweepPoint;
+				CEntity *sweepEntity = nil;
+				modernSweepBlocked[camIndex] = CWorld::ProcessLineOfSight(lastModernSource[camIndex], Source,
+					sweepPoint, sweepEntity, true, false, false, true, false, true, true) &&
+					!IS_TRAFFIC_LIGHT(sweepEntity);
+				if (modernSweepBlocked[camIndex]) Source = sweepPoint.point;
+			} else if (sweepDistanceSq >= sq(20.0f)) {
+				modernSweepBlocked[camIndex] = false; // teleport, not an orbit
+			}
+		} else {
+			modernSweepBlocked[camIndex] = false;
+		}
+#endif
 		if(CWorld::ProcessLineOfSight(TargetCoors, Source, colPoint, entity, true, dontCollideWithCars < 0.1f, false, true, false, true, true) && !IS_TRAFFIC_LIGHT(entity)){
 			float PedColDist = (TargetCoors - colPoint.point).Magnitude();
 			float ColCamDist = newDistance - PedColDist;
@@ -5573,6 +5637,15 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 		}
 		
 		CWorld::pIgnoreEntity = nil;
+#ifdef MODERN_FEATURES
+		// The sweep can move Source off the target ray; use the resulting
+		// direction for the near-plane test as well as the rendered view.
+		if (modernVehicleCamera) {
+			Front = TargetCoors - Source;
+			Front.z += (TargetCoors - Source).Magnitude2D() * Tan(state.pitch);
+			Front.Normalise();
+		}
+#endif
 
 		// If we're seeing blue hell due to camera intersects some surface, fix it.
 		// SA and LCS have this unrolled.
@@ -5631,6 +5704,10 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 	}
 	Front = TargetCoors - Source;
 #ifdef MODERN_FEATURES
+	if (yawAllowed) {
+		lastModernSource[camIndex] = Source;
+		lastModernSourceValid[camIndex] = true;
+	}
 	if (modernVehicleCamera && nextDirectionIsForward)
 		Front.z += (TargetCoors - Source).Magnitude2D() * Tan(state.pitch);
 #endif

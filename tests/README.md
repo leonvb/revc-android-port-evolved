@@ -59,7 +59,7 @@ done
 
 This does not test actual language fonts or menu rendering on an Android device.
 
-## Modern vehicle camera (partial Phase 3)
+## Modern vehicle camera and reverse transitions
 
 ```sh
 python3 tests/test_modern_vehicle_camera_contract.py
@@ -68,12 +68,23 @@ c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=undefined \
 /tmp/modern_vehicle_camera
 ```
 
-The host test covers orbit hold timing, FOV smoothing, reverse-view widening,
-reverse hysteresis and slope look-ahead at 30, 60 and 120 FPS, plus reset,
-invalid steps and long-frame clamping. It does not exercise in-game camera
-collision, scripted transitions, real controller/touch input or rendering;
-these require device testing. The reverse swing integration also needs in-game
-validation.
+The host test covers orbit hold, FOV and pitch smoothing, plus the reverse yaw
+controller at 30, 60 and 120 FPS: entry/return duration, speed and acceleration
+bounds, angle wrapping, neutral hysteresis, repeated reversals, manual
+interruption, independent states, invalid steps and long-frame clamping. The
+trajectory timings are tuning hypotheses, not device measurements. The tests do
+not exercise in-game collision sweeps, scripted transitions, physical
+controller/touch input or rendering; these require device testing.
+
+For comparison builds, define `MODERN_VEHICLE_CAMERA_TRACE` to log per-frame
+vehicle speed, dt, phase, actual yaw, legacy candidate yaw, heading, yaw rate,
+manual hold and ownership. The candidate is calculated from the current new
+trajectory, not a measurement of the old build; record the old build separately
+for a real before/after comparison. Check parking spaces, brake taps, immediate
+forward driving, repeated direction changes, slopes, narrow tunnels, wall
+corners, manual interruption, look-behind and camera/vehicle switching. Check
+Classic camera and touch separately. A blocked sweep can constrain the camera;
+observe that it recovers smoothly when the obstruction clears.
 
 ## Modern third-person muzzle-ray groundwork
 

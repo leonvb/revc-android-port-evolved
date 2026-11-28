@@ -54,6 +54,19 @@ Complete an **action-by-context matrix** before code is frozen: include phone, c
 
 ## M2 — Reverse camera transition and return
 
+**Implementation status:** reverse and forward-return yaw now use separate
+bounded, substepped transitions for eligible Modern car/bike follow cameras.
+Manual orbit and explicit look directions interrupt/reset automatic yaw; a
+camera-source sweep supplements the existing target-to-camera collision checks.
+The old reverse FOV widening remains independent. In the previous code it also
+scaled `targetBeta`, while the legacy follower filtered and rate-limited that
+moving target; it provided no separate forward-return target. Explicit view
+reset flags also directly set `Beta`. The new controller replaces the first
+path only and leaves explicit view resets intact. Compile with
+`MODERN_VEHICLE_CAMERA_TRACE` for trajectory logs. Host tests are not a
+substitute for collision and gameplay testing; entry/return tuning and actual
+before/after traces remain unverified on device. M1 remains incomplete.
+
 - Instrument current `src/core/ModernVehicleCamera.h` and `src/core/Cam.cpp` separately: measure yaw trajectory, angular velocity, reverse-entry/exit delay, interactions with `nextDirectionIsForward`, camera collision and the existing manual orbit hold. Find the actual snapping source before changing coefficients; current reverse widening is not itself a complete yaw controller.
 - Introduce an explicit per-camera/player/vehicle transition state with separate reverse-entry and forward-return targets. Use shortest-angle interpolation with a bounded angular velocity/acceleration and time-step-independent smoothing; use speed hysteresis so braking, gear flicker and slopes do not oscillate. Tune initial targets as **playtest hypotheses**, e.g. smooth visible entry in about 0.5–0.8 s, then resume following forward in about 0.35–0.6 s after confirmed forward movement. Do not enforce an abrupt camera teleport to meet a timer.
 - Manual right-stick/touch orbit remains authoritative. Its normal hold delay applies to user orbit, not an extra delay introduced solely by the reverse-to-forward transition. Reset on camera/vehicle change, cutscene, replay, first-person, look-behind and disabled Modern camera. Retain camera collision and avoid swings through walls.
