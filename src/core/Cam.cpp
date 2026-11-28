@@ -68,7 +68,7 @@ UseModernVehicleFollowCam(CEntity *entity)
 #endif
 #endif
 
-#if defined(MODERN_FEATURES) && defined(PC_PLAYER_CONTROLS)
+#if defined(MODERN_FEATURES) && defined(GTA_PC_CONTROLS)
 static float modernAimBlend[3] = { 0.0f, 0.0f, 0.0f };
 static uint32 modernAimLastFrame[3] = { 0, 0, 0 };
 static bool

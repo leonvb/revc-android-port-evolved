@@ -52,6 +52,10 @@ jobs:
           c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=undefined tests/modern_wheel_input.cpp -o /tmp/modern_wheel_input
           /tmp/modern_wheel_input
           INCLUDES=$(find src -type d -printf ' -I%p')
+          # Handheld builds have GTA_PC_CONTROLS but not PC_PLAYER_CONTROLS.
+          c++ -w -std=c++11 -fsyntax-only -DGTA_HANDHELD \
+            -DRW_GL3 -DLIBRW_SDL2 -DLIBRW $INCLUDES \
+            -Ivendor/librw -Ivendor/sdl2/include src/core/Cam.cpp
           for MODE in enabled disabled; do
             OPTS=""
             if [ "$MODE" = disabled ]; then OPTS=-DTEST_WITHOUT_MODERN_FEATURES; fi
