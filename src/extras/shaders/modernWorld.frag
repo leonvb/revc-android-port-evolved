@@ -1,6 +1,9 @@
 uniform sampler2D tex0;
 uniform sampler2D tex1;
 uniform sampler2D tex2;
+uniform sampler2D tex3;
+uniform mat4 u_shadowMatrix;
+uniform vec4 u_shadowParams; // strength, inverse texture size, depth bias, enabled
 uniform vec4 u_lightMap;
 uniform vec3 u_eye;
 uniform vec4 u_modernPosition[8]; // xyz world center, w radius (0 = disabled)
@@ -14,12 +17,32 @@ FSIN vec2 v_tex1;
 FSIN float v_fog;
 FSIN vec3 v_worldPos;
 FSIN vec3 v_worldNormal;
+float shadowVisibility(vec3 worldPos)
+{
+    if(u_shadowParams.w < 0.5) return 1.0;
+    vec3 p = (u_shadowMatrix * vec4(worldPos, 1.0)).xyz * 0.5 + 0.5;
+    if(p.z <= 0.0 || p.z >= 1.0 || p.x <= 0.0 || p.x >= 1.0 || p.y <= 0.0 || p.y >= 1.0)
+        return 1.0;
+    float sum = 0.0;
+    for(int y = -1; y <= 1; ++y){
+        for(int x = -1; x <= 1; ++x){
+            vec2 uv = clamp(p.xy + vec2(float(x), float(y)) * u_shadowParams.y,
+                            vec2(0.0), vec2(1.0));
+            vec3 encodedDepth = texture(tex3, uv).rgb;
+            float depth = dot(encodedDepth, vec3(1.0, 1.0/255.0, 1.0/65025.0));
+            sum += p.z - u_shadowParams.z <= depth ? 1.0 : 0.0;
+        }
+    }
+    float edge = smoothstep(0.0, 0.04, min(min(p.x, 1.0-p.x), min(p.y, 1.0-p.y)));
+    return 1.0 - u_shadowParams.x * edge * (1.0 - sum/9.0);
+}
 void main(void)
 {
     vec4 diffuse = texture(tex0, vec2(v_tex0.x, 1.0-v_tex0.y));
     vec4 lm = texture(tex1, vec2(v_tex1.x, 1.0-v_tex1.y));
     vec4 color = diffuse * v_color * (1.0 + u_lightMap * (lm - 1.0));
     color.a = v_color.a * diffuse.a * u_lightMap.a;
+    color.rgb *= shadowVisibility(v_worldPos);
     vec3 N = v_worldNormal * inversesqrt(max(dot(v_worldNormal, v_worldNormal), 0.00001));
     vec3 V = u_eye - v_worldPos;
     V *= inversesqrt(max(dot(V, V), 0.00001));

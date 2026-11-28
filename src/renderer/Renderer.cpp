@@ -128,6 +128,25 @@ CRenderer::PreRender(void)
 	CShadows::RenderExtraPlayerShadows();
 }
 
+#if defined(MODERN_FEATURES) && defined(RW_GL3) && defined(EXTENDED_PIPELINES)
+void
+CRenderer::ForEachShadowCandidate(void (*visit)(CEntity *, void *), void *data)
+{
+	for(int i = 0; i < ms_nNoOfVisibleEntities; ++i)
+		visit(ms_aVisibleEntityPtrs[i], data);
+	for(int i = 0; i < ms_nNoOfInVisibleEntities; ++i)
+		visit(ms_aInVisibleEntityPtrs[i], data);
+#ifdef NEW_RENDERER
+	if(gbNewRenderer){
+		for(int i = 0; i < ms_nNoOfVisibleBuildings; ++i)
+			visit(ms_aVisibleBuildingPtrs[i], data);
+		for(int i = 0; i < ms_nNoOfVisibleVehicles; ++i)
+			visit(ms_aVisibleVehiclePtrs[i], data);
+	}
+#endif
+}
+#endif
+
 void
 CRenderer::RenderOneRoad(CEntity *e)
 {

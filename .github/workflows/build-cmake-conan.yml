@@ -61,6 +61,11 @@ jobs:
           python3 tests/modern_bloom_reference.py
           c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g tests/modern_lighting_policy.cpp -o /tmp/modern_lighting_policy
           /tmp/modern_lighting_policy
+          c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g tests/directional_shadow_fit.cpp -o /tmp/directional_shadow_fit
+          /tmp/directional_shadow_fit
+          c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g tests/directional_shadow_plan.cpp -o /tmp/directional_shadow_plan
+          /tmp/directional_shadow_plan
+          python3 tests/directional_shadow_depth.py
       - name: "Checkout Miles SDK Import Library project"
         uses: actions/checkout@v4
         if: ${{ matrix.audio == 'miles' }}
