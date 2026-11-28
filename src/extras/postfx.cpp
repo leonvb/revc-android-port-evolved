@@ -16,6 +16,7 @@
 #include "ModernConfig.h"
 #include "ModernPostFXPolicy.h"
 #include "ModernBloomPlan.h"
+#include "ModernRenderDiagnostics.h"
 #include "Clock.h"
 #endif
 
@@ -631,26 +632,34 @@ void
 CPostFX::RenderModernBloom(RwCamera *cam)
 {
 #if defined(RW_OPENGL) || defined(RW_D3D9)
-	if(!CModernConfig::m_bMasterEnable || CModernConfig::m_nNeonBloom <= 0 ||
-	   !cam || !RwCameraGetRaster(cam) || !pBackBuffer || RwCameraGetNearClipPlane(cam) <= 0.0f)
+	using namespace ModernRenderDiagnostics;
+	if(!CModernConfig::m_bMasterEnable || CModernConfig::m_nNeonBloom <= 0){
+		Report(Bloom, Disabled, 0, 0, 100, CModernConfig::m_nNeonBloom);
 		return;
+	}
+	if(!cam || !RwCameraGetRaster(cam) || !pBackBuffer || RwCameraGetNearClipPlane(cam) <= 0.0f){
+		Report(Bloom, CameraUnavailable);
+		return;
+	}
 #ifdef RW_OPENGL
-	if(!modernBloom) return;
+	if(!modernBloom){ Report(Bloom, ShaderUnavailable); return; }
 #ifdef LIBRW_SDL2
-	if(RwEngineGetRenderScale() < 100) return;
+	if(RwEngineGetRenderScale() < 100){ Report(Bloom, ReducedScale, 0, 0, RwEngineGetRenderScale()); return; }
 #endif
 #else
-	if(!modernBloom_PS) return;
+	if(!modernBloom_PS){ Report(Bloom, ShaderUnavailable); return; }
 #endif
 	RwRaster *scene = RwCameraGetRaster(cam);
 	RwRaster *depth = RwCameraGetZRaster(cam);
 	int width = RwRasterGetWidth(scene), height = RwRasterGetHeight(scene);
 	float capture[4];
 	if(!ModernPostFXPolicy::CaptureParams(width, height, RwRasterGetWidth(pBackBuffer),
-	                                      RwRasterGetHeight(pBackBuffer), capture))
+	                                      RwRasterGetHeight(pBackBuffer), capture)){
+		Report(Bloom, InvalidCapture, width, height);
 		return;
+	}
 #ifdef RW_D3D9
-	if(!BloomRasterAvailable(pBackBuffer)) return;
+	if(!BloomRasterAvailable(pBackBuffer)){ Report(Bloom, TargetFailed, width, height); return; }
 #endif
 	// Do not capture or switch targets on every frame after an allocation error.
 	if(bloomFailedWidth == width && bloomFailedHeight == height) return;
@@ -658,18 +667,21 @@ CPostFX::RenderModernBloom(RwCamera *cam)
 	RwRenderStateSet(rwRENDERSTATETEXTURERASTER, nil);
 	RwCameraEndUpdate(cam);
 	bool ok = EnsureModernBloom(width, height);
+	if(!ok) Report(Bloom, AllocationFailed, width, height);
 	RwCameraSetZRaster(cam, nil);
 	for(int i = 0; ok && i < 5; ++i){
 		ModernBloomPlan::Pass pass = ModernBloomPlan::PassAt(i);
 		RwRaster *source = pass.source < 0 ? pBackBuffer : bloomTargets[pass.source];
 		RwRaster *destination = bloomTargets[pass.destination];
 		if(!BloomRasterAvailable(source) || !BloomRasterAvailable(destination)){
+			Report(Bloom, TargetFailed, width, height, 100, i);
 			ok = false;
 			break;
 		}
 		RwCameraSetRaster(cam, destination);
 		RwCameraBeginUpdate(cam);
 		if(!BloomTargetBound(destination)){
+			Report(Bloom, TargetFailed, width, height, 100, i);
 			RwCameraEndUpdate(cam);
 			ok = false;
 			break;
@@ -705,6 +717,7 @@ CPostFX::RenderModernBloom(RwCamera *cam)
 		amount *= ModernBloomPlan::NightFactor(CClock::GetHours(), CClock::GetMinutes());
 		DrawBloomQuad(cam, bloomTargets[0], RwRasterGetWidth(bloomTargets[0]),
 		              RwRasterGetHeight(bloomTargets[0]), 2, amount);
+		Report(Bloom, Submitted, width, height, 100, CModernConfig::m_nNeonBloom);
 		RwRenderStateSet(rwRENDERSTATETEXTURERASTER, nil);
 	}else{
 		CloseModernBloom();
@@ -722,33 +735,45 @@ void
 CPostFX::RenderExperimentalEdgeAA(RwCamera *cam)
 {
 #if defined(RW_OPENGL) || defined(RW_D3D9)
+	using namespace ModernRenderDiagnostics;
 	if (!CModernConfig::m_bMasterEnable ||
-	    (!CModernConfig::m_bFxaa && !CModernConfig::m_bExperimentalEdgeAA) ||
-	    !cam || !RwCameraGetRaster(cam) || !pBackBuffer)
+	    (!CModernConfig::m_bFxaa && !CModernConfig::m_bExperimentalEdgeAA)){
+		Report(Fxaa, Disabled);
 		return;
+	}
+	if (!cam || !RwCameraGetRaster(cam) || !pBackBuffer){
+		Report(Fxaa, CameraUnavailable);
+		return;
+	}
 #if defined(RW_OPENGL) && defined(LIBRW_SDL2)
 	// The GL raster-copy path still uses unscaled camera dimensions. Avoid
 	// sampling outside the scaled framebuffer until that path is corrected.
-	if (RwEngineGetRenderScale() < 100)
+	if (RwEngineGetRenderScale() < 100){
+		Report(Fxaa, ReducedScale, 0, 0, RwEngineGetRenderScale());
 		return;
+	}
 #endif
 #ifdef RW_OPENGL
 	// Prefer FXAA 3.11; the older preview is an independent opt-in fallback.
 	rw::gl3::Shader *shader = CModernConfig::m_bFxaa ? modernFXAA : nil;
 	if (!shader && CModernConfig::m_bExperimentalEdgeAA) shader = modernAA;
-	if (!shader) return;
+	if (!shader){ Report(Fxaa, ShaderUnavailable); return; }
+	const bool usingFxaa = shader == modernFXAA;
 #else
 	void *shader = CModernConfig::m_bFxaa ? modernFXAA_PS : nil;
 	if (!shader && CModernConfig::m_bExperimentalEdgeAA) shader = modernAA_PS;
-	if (!shader) return;
+	if (!shader){ Report(Fxaa, ShaderUnavailable); return; }
+	const bool usingFxaa = shader == modernFXAA_PS;
 #endif
 	int width = RwRasterGetWidth(RwCameraGetRaster(cam));
 	int height = RwRasterGetHeight(RwCameraGetRaster(cam));
 	int texWidth = RwRasterGetWidth(pBackBuffer);
 	int texHeight = RwRasterGetHeight(pBackBuffer);
 	float params[4];
-	if (!ModernPostFXPolicy::CaptureParams(width, height, texWidth, texHeight, params))
+	if (!ModernPostFXPolicy::CaptureParams(width, height, texWidth, texHeight, params)){
+		Report(Fxaa, InvalidCapture, width, height);
 		return; // framebuffer has changed or the capture isn't usable
+	}
 
 	// Capture after world effects and motion blur, before HUD/menu rendering.
 	GetBackBuffer(cam);
@@ -771,6 +796,7 @@ CPostFX::RenderExperimentalEdgeAA(RwCamera *cam)
 	rw::d3d::im2dOverridePS = shader;
 #endif
 	RwIm2DRenderIndexedPrimitive(rwPRIMTYPETRILIST, Vertex, 4, Index, 6);
+	Report(Fxaa, Submitted, width, height, 100, usingFxaa ? 1 : 0);
 #ifdef RW_OPENGL
 	rw::gl3::im2dOverrideShader = nil;
 #else

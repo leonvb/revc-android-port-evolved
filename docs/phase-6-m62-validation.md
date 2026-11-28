@@ -31,6 +31,20 @@ Unsupported shader models, unavailable shaders, invalid capture bounds and
 failed target creation bypass the new effects.
 The budget estimates tightly packed RGBA8 memory, not actual driver allocation.
 
+## Android runtime diagnostics
+
+Android writes `[ModernRender]` entries to logcat and, when the game folder is
+writable, to `log.txt` in that folder (normally `reVC/log.txt` on shared
+storage). A session-start marker separates launches. Each effect/status pair
+is logged at most once per launch, including disabled or bypass reasons and a
+`draw submitted` status; this avoids per-frame disk writes. A submitted draw
+or selected world pipeline only means the CPU reached that path, not that the
+GPU produced the expected pixels. Shadow detail is the initial caster count;
+bloom detail is the selected bloom level; AA detail is 1 for FXAA and 0 for
+the experimental fallback. World detail bits report vertex normals (1), road
+(2), and active shadow map (4) for the first selected world atomic. These are
+initial observations, not frame-by-frame telemetry.
+
 ## Evidence and remaining checks
 
 - Standalone tests exercise pairing, bounds, target budget, pass ordering,

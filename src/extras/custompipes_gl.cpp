@@ -15,6 +15,7 @@
 #ifdef MODERN_FEATURES
 #include "ModernConfig.h"
 #include "ModernLighting.h"
+#include "ModernRenderDiagnostics.h"
 #if defined(RW_GL3)
 #include "DirectionalShadowPlan.h"
 #include "Entity.h"
@@ -201,16 +202,30 @@ RenderDirectionalShadowMap(void)
 	using namespace rw;
 	using namespace rw::gl3;
 	using namespace DirectionalShadowPlan;
+	using namespace ModernRenderDiagnostics;
 	directionalShadowValid = false;
-	if(!CModernConfig::m_bMasterEnable || CModernConfig::m_nRealtimeShadows == 0 ||
-	   !modernWorldShader || !directionalShadowShader || CGame::IsInInterior() ||
-	   CCutsceneMgr::IsCutsceneProcessing() || !Scene.camera){
+	if(!CModernConfig::m_bMasterEnable || CModernConfig::m_nRealtimeShadows == 0){
+		Report(Shadow, Disabled, 0, 0, 100, CModernConfig::m_nRealtimeShadows);
 		directionalShadowHasBasis = false;
 		return;
 	}
+	if(!modernWorldShader || !directionalShadowShader){
+		Report(Shadow, ShaderUnavailable, 0, 0, 100, !modernWorldShader ? 1 : 2);
+		directionalShadowHasBasis = false;
+		return;
+	}
+	if(CGame::IsInInterior() || CCutsceneMgr::IsCutsceneProcessing()){
+		Report(Shadow, SceneExcluded);
+		directionalShadowHasBasis = false;
+		return;
+	}
+	if(!Scene.camera){ Report(Shadow, CameraUnavailable); directionalShadowHasBasis = false; return; }
 	Camera *camera = Scene.camera;
 	if(camera->projection != Camera::PERSPECTIVE || !camera->getFrame() ||
-	   camera->viewOffset.x != 0.0f || camera->viewOffset.y != 0.0f) return;
+	   camera->viewOffset.x != 0.0f || camera->viewOffset.y != 0.0f){
+		Report(Shadow, InvalidView);
+		return;
+	}
 	const Matrix *frame = camera->getFrame()->getLTM();
 	Vec3 eye = {frame->pos.x, frame->pos.y, frame->pos.z};
 	Vec3 right = {frame->right.x, frame->right.y, frame->right.z};
@@ -219,6 +234,7 @@ RenderDirectionalShadowMap(void)
 	CVector &sun = CTimeCycle::GetSunDirection();
 	CelestialLight light;
 	if(!SelectCelestialLight({sun.x, sun.y, sun.z}, &light) || light.strength <= 0.0){
+		Report(Shadow, NoCelestialLight);
 		directionalShadowHasBasis = false;
 		return;
 	}
@@ -226,11 +242,17 @@ RenderDirectionalShadowMap(void)
 	float maxDistance = CModernConfig::m_nRealtimeShadows >= 2 ? 100.0f : 70.0f;
 	float farDistance = Min(camera->farPlane, maxDistance);
 	if(!PerspectiveCorners(eye, right, up, forward, camera->viewWindow.x, camera->viewWindow.y,
-	                       camera->nearPlane, farDistance, corners)) return;
+	                       camera->nearPlane, farDistance, corners)){
+		Report(Shadow, InvalidView);
+		return;
+	}
 	int size = CModernConfig::m_nRealtimeShadows >= 2 ? 1024 : 512;
-	if(!CreateDirectionalShadowResources(size)) return;
+	if(!CreateDirectionalShadowResources(size)){ Report(Shadow, AllocationFailed, size, size); return; }
 	if(!DirectionalShadowFit::Build(corners, light.direction, size, 3.0, 45.0, &directionalShadowFit,
-	          directionalShadowHasBasis ? &directionalShadowRight : nullptr)) return;
+	          directionalShadowHasBasis ? &directionalShadowRight : nullptr)){
+		Report(Shadow, FitFailed, size, size);
+		return;
+	}
 	directionalShadowRight = directionalShadowFit.right;
 	directionalShadowHasBasis = true;
 	for(int row = 0; row < 4; ++row)
@@ -241,12 +263,13 @@ RenderDirectionalShadowMap(void)
 	ShadowCandidates candidates;
 	candidates.eye = eye;
 	CRenderer::ForEachShadowCandidate(CollectShadowCandidate, &candidates);
-	if(candidates.collector.count == 0) return;
+	if(candidates.collector.count == 0){ Report(Shadow, NoCasters, size, size); return; }
 
 	Camera *previousCamera = rw::engine->currentCamera;
 	World *previousWorld = rw::engine->currentWorld;
 	RwCameraBeginUpdate(directionalShadowCamera);
 	if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE){
+		Report(Shadow, TargetFailed, size, size);
 		RwCameraEndUpdate(directionalShadowCamera);
 		rw::engine->currentCamera = previousCamera;
 		rw::engine->currentWorld = previousWorld;
@@ -284,6 +307,7 @@ RenderDirectionalShadowMap(void)
 	rw::engine->currentCamera = previousCamera;
 	rw::engine->currentWorld = previousWorld;
 	directionalShadowValid = true;
+	Report(Shadow, Submitted, size, size, 100, int(candidates.collector.count));
 }
 
 static void
@@ -504,6 +528,9 @@ worldRenderCB(rw::Atomic *atomic, rw::gl3::InstanceDataHeader *header)
 
 #ifdef MODERN_FEATURES
 	if(useModern){
+		ModernRenderDiagnostics::Report(ModernRenderDiagnostics::WorldGeometry, ModernRenderDiagnostics::Selected,
+			0, 0, 100, ((atomic->geometry->flags & Geometry::NORMALS) ? 1 : 0) |
+			(modernRenderingRoad ? 2 : 0) | (shadowActive ? 4 : 0));
 		modernWorldShader->use();
 		ModernLightUniforms lights;
 		BuildModernLights(atomic, CModernConfig::m_bDynamicPointLights != 0, lights);
@@ -1084,6 +1111,9 @@ AtomicFirstPass(RpAtomic *atomic, int pass, bool road)
 		if(!setupDone){
 #ifdef MODERN_FEATURES
 			if(useModern){
+				ModernRenderDiagnostics::Report(ModernRenderDiagnostics::WorldGeometry, ModernRenderDiagnostics::Selected,
+					0, 0, 100, ((flags & Geometry::NORMALS) ? 1 : 0) | (road ? 2 : 0) |
+					(CustomPipes::directionalShadowValid ? 4 : 0));
 				CustomPipes::modernWorldShader->use();
 				ModernLightUniforms local;
 				BuildModernLights(atomic, CModernConfig::m_bDynamicPointLights != 0, local);

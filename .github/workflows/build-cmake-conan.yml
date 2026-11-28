@@ -39,6 +39,8 @@ jobs:
           /tmp/gps_path_search
           c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g tests/modern_visual_policy.cpp -o /tmp/modern_visual_policy
           /tmp/modern_visual_policy
+          c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=address,undefined -g tests/modern_render_diagnostics.cpp -o /tmp/modern_render_diagnostics
+          /tmp/modern_render_diagnostics
           python3 tests/test_priority_scan_contract.py
           python3 tests/test_radar_distance_contract.py
           python3 tests/test_modern_render_contract.py
