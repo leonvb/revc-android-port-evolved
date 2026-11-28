@@ -4,11 +4,40 @@
 #ifdef MODERN_FEATURES
 
 #include "Frontend.h"
+#include "Camera.h"
+#include "PlayerPed.h"
+#include "Pad.h"
+#include "Replay.h"
+#include "Record.h"
+#include "CutsceneMgr.h"
+#include "Timer.h"
 #include "skeleton.h"
 
 #if defined ANDROID
 #include "JavaWrapper.h"
 #endif
+
+bool
+CModernConfig::IsModernAimActive()
+{
+#ifdef PC_PLAYER_CONTROLS
+	if (!m_bMasterEnable || m_nAimMode == MODERN_AIM_CLASSIC ||
+	    CTimer::GetIsPaused() || CReplay::IsPlayingBack() || CRecordDataForGame::IsPlayingBack() || CCutsceneMgr::IsCutsceneProcessing() ||
+	    TheCamera.WhoIsInControlOfTheCamera != CAMCONTROL_GAME || TheCamera.m_WideScreenOn)
+		return false;
+	CPlayerPed *player = FindPlayerPed();
+	CPad *pad = CPad::GetPad(0);
+	if (!player || TheCamera.pTargetEntity != player || player->bInVehicle || player->m_attachedTo || !player->IsPedInControl() ||
+	    pad->ArePlayerControlsDisabled() || !pad->GetTarget() || pad->GetLookBehindForPed() ||
+	    TheCamera.Cams[TheCamera.ActiveCam].Mode != CCam::MODE_FOLLOWPED)
+		return false;
+	eWeaponType weapon = player->GetWeapon()->m_eWeaponType;
+	return (weapon >= WEAPONTYPE_COLT45 && weapon <= WEAPONTYPE_RUGER) ||
+		weapon == WEAPONTYPE_M60 || weapon == WEAPONTYPE_MINIGUN || weapon == WEAPONTYPE_FLAMETHROWER;
+#else
+	return false;
+#endif
+}
 
 int8 CModernConfig::m_nPreset = MODERN_PRESET_CLASSIC;
 int8 CModernConfig::m_bMasterEnable = 0;

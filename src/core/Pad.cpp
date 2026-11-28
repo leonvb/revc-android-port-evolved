@@ -1,5 +1,8 @@
 #define WITHDINPUT
 #include "common.h"
+#ifdef MODERN_FEATURES
+#include "ModernWheels.h"
+#endif
 #include "crossplatform.h"
 #include "platform.h"
 #ifdef XINPUT
@@ -2241,6 +2244,9 @@ int16 CPad::GetSteeringUpDown(void)
 
 int16 CPad::GetCarGunUpDown(void)
 {
+#ifdef MODERN_FEATURES
+	if (this == CPad::GetPad(0) && CModernWheels::IsOpen()) return 0;
+#endif
 	if ( ArePlayerControlsDisabled() )
 		return 0;
 
@@ -2268,6 +2274,9 @@ int16 CPad::GetCarGunUpDown(void)
 
 int16 CPad::GetCarGunLeftRight(void)
 {
+#ifdef MODERN_FEATURES
+	if (this == CPad::GetPad(0) && CModernWheels::IsOpen()) return 0;
+#endif
 	if ( ArePlayerControlsDisabled() )
 		return 0;
 
@@ -3358,6 +3367,9 @@ int16 CPad::SniperModeLookUpDown(void)
 
 int16 CPad::LookAroundLeftRight(void)
 {
+#ifdef MODERN_FEATURES
+	if (this == CPad::GetPad(0) && CModernWheels::IsOpen()) return 0;
+#endif
 	float axis = GetPad(0)->NewState.RightStickX;
 
 	if ( Abs(axis) > 85 && !GetLookBehindForPed() )
@@ -3373,6 +3385,9 @@ int16 CPad::LookAroundLeftRight(void)
 
 int16 CPad::LookAroundUpDown(void)
 {
+#ifdef MODERN_FEATURES
+	if (this == CPad::GetPad(0) && CModernWheels::IsOpen()) return 0;
+#endif
 	int16 axis = GetPad(0)->NewState.RightStickY;
 #ifdef FIX_BUGS
 	axis = -axis;

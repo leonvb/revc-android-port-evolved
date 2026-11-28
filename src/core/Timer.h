@@ -10,6 +10,9 @@ class CTimer
 	static uint32 m_snPreviousTimeInMilliseconds;
 	static uint32 m_FrameCounter;
 	static float ms_fTimeScale;
+#ifdef MODERN_FEATURES
+	static uint32 m_TimeScaleRevision;
+#endif
 	static float ms_fTimeStep;
 	static float ms_fTimeStepNonClipped;
 #ifdef FIX_BUGS
@@ -39,7 +42,14 @@ public:
 	static uint32 GetPreviousTimeInMilliseconds(void) { return m_snPreviousTimeInMilliseconds; }
 	static void SetPreviousTimeInMilliseconds(uint32 t) { m_snPreviousTimeInMilliseconds = t; }
 	static const float &GetTimeScale(void) { return ms_fTimeScale; }
-	static void SetTimeScale(float ts) { ms_fTimeScale = ts; }
+	static void SetTimeScale(float ts) { ms_fTimeScale = ts;
+#ifdef MODERN_FEATURES
+		++m_TimeScaleRevision;
+#endif
+	}
+#ifdef MODERN_FEATURES
+	static uint32 GetTimeScaleRevision() { return m_TimeScaleRevision; }
+#endif
 	static uint32 GetCyclesPerFrame();
 
 	static bool GetIsPaused() { return m_UserPause || m_CodePause; }

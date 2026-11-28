@@ -33,6 +33,9 @@
 #include "Debug.h"
 #include "GenericGameStorage.h"
 #include "Camera.h"
+#ifdef MODERN_FEATURES
+#include "ModernConfig.h"
+#endif
 
 enum
 {
@@ -3975,6 +3978,10 @@ CCamera::Find3rdPersonCamTargetVector(float dist, CVector pos, CVector &source, 
 	}else{
 		float angleX = DEGTORAD((m_f3rdPersonCHairMultX-0.5f) * 1.8f * 0.5f * Cams[ActiveCam].FOV * CDraw::GetAspectRatio());
 		float angleY = DEGTORAD((0.5f-m_f3rdPersonCHairMultY) * 1.8f * 0.5f * Cams[ActiveCam].FOV);
+#ifdef MODERN_FEATURES
+		if (CModernConfig::IsModernAimActive())
+			angleX = angleY = 0.0f;
+#endif
 		source = Cams[ActiveCam].Source;
 		target = Cams[ActiveCam].Front;
 		target += Cams[ActiveCam].Up * Tan(angleY);
@@ -3993,6 +4000,10 @@ CCamera::Find3rdPersonQuickAimPitch(void)
 
 	float rot = Asin(clampedFrontZ);
 
+#ifdef MODERN_FEATURES
+	if (CModernConfig::IsModernAimActive())
+		return -rot;
+#endif
 	return -(DEGTORAD(((0.5f - m_f3rdPersonCHairMultY) * 1.8f * 0.5f * Cams[ActiveCam].FOV)) + rot);
 }
 

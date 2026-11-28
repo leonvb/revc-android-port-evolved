@@ -36,6 +36,12 @@
 #include "Sprite.h"
 #include "Pickups.h"
 #include "SaveBuf.h"
+#ifdef MODERN_FEATURES
+#include "ModernConfig.h"
+#include "ModernAimGeometry.h"
+#include "CutsceneMgr.h"
+#include "Replay.h"
+#endif
 
 float fReloadAnimSampleFraction[5] = {  0.5f,  0.7f,  0.75f,  0.75f,  0.7f };
 float fSeaSparrowAimingAngle = 10.0f;
@@ -69,6 +75,71 @@ Find3rdPersonCamTargetVectorFromCachedVectors(float dist, CVector pos, CVector& 
 		target = dist * target + source;
 		return true;
 	}
+}
+#endif
+
+#ifdef MODERN_FEATURES
+// This is deliberately restricted to the existing player third-person aim path.
+// Scoped weapons, drive-bys, scripted cameras and classic targeting keep their
+// original firing code. The resulting second ray still performs normal damage.
+static bool
+PrepareModernMuzzleRay(CEntity *shooter, const CVector &muzzle, float range,
+                       CVector &source, CVector &target)
+{
+	CPad *pad = CPad::GetPad(0);
+	if (!CModernConfig::m_bMasterEnable || CModernConfig::m_nAimMode == MODERN_AIM_CLASSIC ||
+	    !CModernConfig::IsModernAimActive() || shooter != FindPlayerPed() || ((CPed*)shooter)->m_pPointGunAt ||
+	    ((CPed*)shooter)->bInVehicle || !pad->GetTarget() || pad->ArePlayerControlsDisabled() ||
+	    pad->GetLookBehindForPed() || range <= 0.0f ||
+	    TheCamera.WhoIsInControlOfTheCamera != CAMCONTROL_GAME ||
+	    !TheCamera.Cams[TheCamera.ActiveCam].Using3rdPersonMouseCam() ||
+	    CCutsceneMgr::IsCutsceneProcessing() || CReplay::IsPlayingBack())
+		return false;
+
+	CVector projectedSource, projectedTarget;
+	CVector cameraSource = TheCamera.Cams[TheCamera.ActiveCam].Source;
+	// Use the same active camera and reticle as the HUD; cached animation
+	// vectors may not have been initialized for a newly selected weapon.
+	TheCamera.Find3rdPersonCamTargetVector(range, muzzle, projectedSource, projectedTarget);
+
+	CVector rayDirection = projectedTarget - projectedSource;
+	if (rayDirection.MagnitudeSqr() < 0.0001f)
+		return false;
+	rayDirection.Normalise();
+	// Extend the camera ray by its distance to the muzzle, so the range is not
+	// accidentally shortened by the third-person camera offset.
+	CVector cameraEnd = cameraSource + rayDirection * (range + (muzzle - cameraSource).Magnitude());
+	CColPoint hit;
+	CEntity *hitEntity = nil;
+	CEntity *oldIgnoredEntity = CWorld::pIgnoreEntity;
+	CWorld::pIgnoreEntity = shooter;
+	bool hitWorld = CWorld::ProcessLineOfSight(cameraSource, cameraEnd, hit, hitEntity,
+		true, true, true, true, true, false, false, true);
+	CWorld::pIgnoreEntity = oldIgnoredEntity;
+
+	// If the muzzle has crossed a wall, hit it from the torso side rather
+	// than allowing the muzzle-origin shot to pass through the obstruction.
+	CVector chest = shooter->GetPosition();
+	chest.z += ((CPed*)shooter)->bIsDucking ? 0.35f : 0.7f;
+	if ((muzzle - chest).MagnitudeSqr() > 0.0001f) {
+		CColPoint obstruction;
+		CEntity *obstructionEntity = nil;
+		CWorld::pIgnoreEntity = shooter;
+		bool blocked = CWorld::ProcessLineOfSight(chest, muzzle, obstruction, obstructionEntity,
+			true, true, false, true, true, false, false, true);
+		CWorld::pIgnoreEntity = oldIgnoredEntity;
+		if (blocked) {
+			source = chest;
+			target = muzzle + (muzzle - chest) * 0.05f;
+			return true;
+		}
+	}
+
+	CVector aimPoint = hitWorld ? hit.point : cameraEnd;
+	CVector muzzleDirection = ModernMuzzleAimDirection(muzzle, aimPoint, rayDirection);
+	source = muzzle;
+	target = muzzle + muzzleDirection * range;
+	return true;
 }
 #endif
 
@@ -964,7 +1035,11 @@ CWeapon::FireInstantHit(CEntity *shooter, CVector *fireSource)
 		ahead.Normalise();
 #endif
 	}
-	else if ( shooter == FindPlayerPed() && TheCamera.Cams[0].Using3rdPersonMouseCam()  )
+	else if ( shooter == FindPlayerPed() && (TheCamera.Cams[0].Using3rdPersonMouseCam()
+#ifdef MODERN_FEATURES
+		|| CModernConfig::IsModernAimActive()
+#endif
+		) )
 	{
 #ifdef FREE_CAM
 		if (CCamera::bFreeCam) {
@@ -984,6 +1059,15 @@ CWeapon::FireInstantHit(CEntity *shooter, CVector *fireSource)
 			TheCamera.Find3rdPersonCamTargetVector(info->m_fRange, *fireSource, source, target);
 		}
 
+		CWorld::bIncludeBikers = true;
+		CWorld::bIncludeDeadPeds = true;
+		CWorld::bIncludeCarTyres = true;
+#ifdef MODERN_FEATURES
+		bool modernMuzzleRay = PrepareModernMuzzleRay(shooter, *fireSource, info->m_fRange, source, target);
+		CEntity *oldIgnoredEntity = CWorld::pIgnoreEntity;
+		if (modernMuzzleRay)
+			CWorld::pIgnoreEntity = shooter;
+#endif
 #ifdef FIX_BUGS
 		// fix muzzleflash rotation
 		heading = CGeneral::GetAngleBetweenPoints(source.x, source.y, target.x, target.y);
@@ -992,10 +1076,10 @@ CWeapon::FireInstantHit(CEntity *shooter, CVector *fireSource)
 		ahead = CVector2D(-Sin(angle), Cos(angle));
 		ahead.Normalise();
 #endif
-		CWorld::bIncludeBikers = true;
-		CWorld::bIncludeDeadPeds = true;
-		CWorld::bIncludeCarTyres = true;
 		ProcessLineOfSight(source, target, point, victim, m_eWeaponType, shooter, true, true, true, true, true, false, false);
+#ifdef MODERN_FEATURES
+		CWorld::pIgnoreEntity = oldIgnoredEntity;
+#endif
 		CWorld::bIncludeBikers = false;
 		CWorld::bIncludeDeadPeds = false;
 		CWorld::bIncludeCarTyres = false;
@@ -1723,6 +1807,22 @@ CWeapon::FireShotgun(CEntity *shooter, CVector *fireSource)
 	float halfAngleRange = angleRange / 2.f;
 	float angleBetweenTwoShot = angleRange / (shootsAtOnce - 1.f);
 
+#ifdef MODERN_FEATURES
+	// Resolve the centre ray once for the whole pellet pattern.
+	CVector modernShotSource, modernShotTarget;
+	bool modernShot = false;
+	if (shooter == FindPlayerPed() && (TheCamera.Cams[0].Using3rdPersonMouseCam() || CModernConfig::IsModernAimActive())) {
+		bool oldBikers = CWorld::bIncludeBikers;
+		bool oldDeadPeds = CWorld::bIncludeDeadPeds;
+		bool oldTyres = CWorld::bIncludeCarTyres;
+		CWorld::bIncludeBikers = CWorld::bIncludeDeadPeds = CWorld::bIncludeCarTyres = true;
+		modernShot = PrepareModernMuzzleRay(shooter, *fireSource, info->m_fRange, modernShotSource, modernShotTarget);
+		CWorld::bIncludeBikers = oldBikers;
+		CWorld::bIncludeDeadPeds = oldDeadPeds;
+		CWorld::bIncludeCarTyres = oldTyres;
+	}
+#endif
+
 	for ( int32 i = 0; i < shootsAtOnce; i++ )
 	{
 		float shootAngle = DEGTORAD(RADTODEG(halfAngleRange - angleBetweenTwoShot * i) + shooterAngle);
@@ -1733,7 +1833,11 @@ CWeapon::FireShotgun(CEntity *shooter, CVector *fireSource)
 		CColPoint point;
 		CEntity *victim;
 
-		if ( shooter == FindPlayerPed() && TheCamera.Cams[0].Using3rdPersonMouseCam() )
+		if ( shooter == FindPlayerPed() && (TheCamera.Cams[0].Using3rdPersonMouseCam()
+#ifdef MODERN_FEATURES
+		    || CModernConfig::IsModernAimActive()
+#endif
+		    ) )
 		{
 			CVector Left;
 #ifdef FREE_CAM
@@ -1750,13 +1854,27 @@ CWeapon::FireShotgun(CEntity *shooter, CVector *fireSource)
 			}
 
 			float f = (i - (shootsAtOnce / 2)) * angleBetweenTwoShot;
-			target  = f * Left + target - source;
-			target *= info->m_fRange;
-			target += source;
+#ifdef MODERN_FEATURES
+			if (modernShot) {
+				source = modernShotSource;
+				target = modernShotTarget - modernShotSource;
+				target.Normalise();
+				Left = CrossProduct(TheCamera.Cams[TheCamera.ActiveCam].Front, TheCamera.Cams[TheCamera.ActiveCam].Up);
+			} else
+#endif
+				target -= source;
+			target = source + (target + f * Left) * info->m_fRange;
 			CWorld::bIncludeCarTyres = true;
 			CWorld::bIncludeBikers = true;
 			CWorld::bIncludeDeadPeds = true;
+#ifdef MODERN_FEATURES
+			CEntity *oldIgnoredEntity = CWorld::pIgnoreEntity;
+			if (modernShot) CWorld::pIgnoreEntity = shooter;
+#endif
 			ProcessLineOfSight(source, target, point, victim, m_eWeaponType, shooter, true, true, true, true, true, false, false);
+#ifdef MODERN_FEATURES
+			CWorld::pIgnoreEntity = oldIgnoredEntity;
+#endif
 			CWorld::bIncludeDeadPeds = false;
 			CWorld::bIncludeCarTyres = false;
 		}
@@ -2187,6 +2305,18 @@ CWeapon::FireAreaEffect(CEntity *shooter, CVector *fireSource)
 	CVector target;
 	CVector dir;
 
+#ifdef MODERN_FEATURES
+	if (shooter == FindPlayerPed() && CModernConfig::IsModernAimActive() &&
+	    PrepareModernMuzzleRay(shooter, *fireSource, info->m_fRange, source, target)) {
+		// Area-effect shots don't collide with walls in ShotInfo. Refuse to
+		// spawn one if the chest-to-muzzle check found an obstruction.
+		if ((source - *fireSource).MagnitudeSqr() > 0.0001f)
+			return true;
+		dir = target - source;
+		if (dir.MagnitudeSqr() < 0.0001f) return true;
+		dir.Normalise();
+	} else
+#endif
 	if ( shooter == FindPlayerPed() && TheCamera.Cams[0].Using3rdPersonMouseCam() )
 	{
 #ifdef FREE_CAM
