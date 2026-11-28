@@ -74,6 +74,30 @@ before/after traces remain unverified on device. M1 remains incomplete.
 
 ## M3 — Magnetic reticle / aim assist setting
 
+**Implementation status:** the Modernization menu now exposes Off / Low /
+Medium / High, independently of aim mode. Classic defaults to Off; Modern
+presets default to Medium. Existing Modern-preset settings without the new key
+migrate to Medium, while Classic/Custom settings without it migrate to Off.
+The old Modern Assisted snap/flick and unconditional friction are replaced by
+one adjustable system in both Modern aim modes, so they cannot stack. Free
+Aim uses 65% of the selected strength; Assisted uses the full strength. Off adds
+no magnetism or old assisted snap/flick. Mouse/keyboard are excluded; Android
+touch uses lighter tuning than physical pads.
+
+For supported on-foot instant-hit/shotgun weapons, the camera retains one
+hostile ped using a generation-checked pool handle; unsuccessful acquisition
+scans are rate-limited. It applies bounded camera
+attraction and friction only with clear camera, chest-to-muzzle and muzzle
+lines; an occluded target gets a short retention grace but no attraction. A
+lost target is not silently replaced until a fresh aim or deliberate strong
+stick input. Aim height follows the reticle within the body rather than forcing
+head-level aim to the torso. Scoped, heavy/area, vehicle, scripted, replay,
+Classic and disabled-control cases are excluded. Switch/handheld still lacks
+its underlying Modern OTS aiming path and therefore has no magnetism. The
+flamethrower's legacy area propagation remains an existing exception, not a
+claimed reticle/muzzle-parity fix. The code and host tests still require device
+gameplay validation and tuning.
+
 - Add **Aim Magnetism: Off / Low / Medium / High** to the Modernization menu and persisted Modern config; specify defaults explicitly (Classic preset Off; Modern preset Medium) and localize/fallback text. It is distinct from the existing Classic / Free / Assisted aim-mode choice: magnetism operates only during supported Modern aiming with an eligible input device, and Off is exactly the unmodified camera/aim path. Existing Assisted snap and friction must not stack twice; define how those features are scaled or replaced for each value.
 - Extend the existing target selection rather than scan every ped multiple times per frame. Candidate must be alive, eligible, in weapon range, near the reticle and visible to camera **and** not blocked from the muzzle. Use stable pool/reference handles with invalidation; no persistent raw dangling pointers. Include moving targets, friendly/mission targets, camera occlusion and target deletion. Do not acquire random bystanders just because they are closer.
 - Implement bounded, time-step-independent angular friction plus gentle tracking/rotational attraction while the player aims; soft attraction fades with angular distance. Hysteresis and a short occlusion grace prevent hopping. Strong manual stick input always breaks/overrides the attraction and permits free aiming and headshots. No hidden bullet bending, through-wall aim, hard lock or unsolicited target switching. Calibrate gamepad, touch and mouse separately; default mouse Off unless explicitly supported. Disable/reset for cutscenes, scripted cameras, menus, free aim when setting is Off, unsupported weapons, vehicle/rail-shooter/scoped modes and invalid players.

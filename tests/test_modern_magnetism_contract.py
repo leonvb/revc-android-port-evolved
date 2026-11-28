@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+"""Integration guard checks; math/state behavior is exercised by the host test."""
+from pathlib import Path
+root = Path(__file__).resolve().parents[1]
+cam = (root / 'src/core/Cam.cpp').read_text()
+config = (root / 'src/core/ModernConfig.cpp').read_text()
+ini = (root / 'src/core/re3.cpp').read_text()
+menu = (root / 'src/core/MenuScreensCustom.cpp').read_text()
+text = (root / 'src/text/Text.cpp').read_text()
+weapon = (root / 'src/weapons/Weapon.cpp').read_text()
+assert 'm_nAimMagnetism = MODERN_MAGNETISM_OFF' in config
+assert 'm_nAimMagnetism = MODERN_MAGNETISM_MEDIUM' in config
+assert 'm_nAimMagnetism > MODERN_MAGNETISM_HIGH' in config
+assert 'ReadIniIfExists("Modern", "AimMagnetism"' in ini
+assert 'StoreIni("Modern", "AimMagnetism"' in ini
+assert 'MODERN_PRESET_MODERN ?' in ini
+assert '"FEM_MAG"' in menu and 'modernMagnetismOpts' in menu
+assert all(f'"{key}"' in text for key in ('FEM_MAG', 'FAM_LOW', 'FAM_MED', 'FAM_HIG'))
+for language in ('american', 'french', 'german', 'italian', 'spanish'):
+    data = (root / 'utils/gxt' / (language + '.txt')).read_text(encoding='utf-8')
+    for key in ('FEM_MAG', 'FAM_LOW', 'FAM_MED', 'FAM_HIG'):
+        assert f'[{key}]' in data, (language, key)
+for item in ('MODERN_MAGNETISM_OFF', 'controllerInput', '!UseMouse', 'aimDiscontinuity',
+             'TheCamera.ActiveCam', '!FrontEndMenuManager.GetIsMenuActive()',
+             '!TheCamera.Using1stPersonWeaponMode()', '!CModernWheels::IsOpen()',
+             '!TheCamera.m_bUseTransitionBeta', 'WEAPONTYPE_COLT45', 'WEAPONTYPE_RUGER',
+             'WEAPON_FIRE_INSTANT_HIT', 'AndroidPhysicalControllerConnected()',
+             'inputAmount >= tuning.breakInput', 'magnet.BeginFrame', 'magnet.Visible',
+             'aimPool->GetAt(magnet.target)', 'CPools::GetPedRef(ped)',
+             'ped->bIsPlayerFriend', 'ped->DyingOrDead()', 'ped->bNeverEverTargetThisPed',
+             'ModernMagnetismLineClear(chest, muzzle', 'ModernMagnetismLineClear(Source, magnetPoint',
+             'ModernMagnetismLineClear(muzzle, magnetPoint', 'ModernAimMagnetism::BodyHeight',
+             'ModernAimMagnetism::ShortestAngle', 'ModernAimMagnetism::Attraction'):
+    assert item in cam, item
+assert cam.count('FindModernAimThreat(aimPlayer,') == 1
+assert 'snapTime[aimCamIndex]' not in cam and 'LookLeftRight *= 0.65f' not in cam
+assert 'PrepareModernMuzzleRay' in weapon
+print('Modern aim magnetism config, source, visibility and lifecycle contract passed')

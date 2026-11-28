@@ -102,6 +102,39 @@ only to supported third-person instant-hit and shotgun aim paths. OTS camera,
 strafing and aim assist require device validation.
 
 
+## Modern aim magnetism
+
+```sh
+python3 tests/test_modern_magnetism_contract.py
+c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=undefined \
+  tests/modern_aim_magnetism.cpp -o /tmp/modern_aim_magnetism
+/tmp/modern_aim_magnetism
+c++ -std=c++11 -Wall -Wextra -Werror -Wno-unused-parameter -fsanitize=undefined \
+  tests/modern_magnetism_pool.cpp -o /tmp/modern_magnetism_pool
+/tmp/modern_magnetism_pool
+```
+
+These cover strength ordering, Off identity, bounded and FPS-independent math,
+angle wrap, nearest-body height, acquisition scoring/range, override cooldown,
+visibility grace and no automatic target hopping. The pool test uses the actual
+pool generation handles for deletion and slot reuse. Source contracts check the
+camera/muzzle LOS, device and gameplay guards. They do **not** run engine
+collision, rendering, actual input arbitration, animated muzzle positions or
+weapon gameplay. Test those on-device, including aim release, two enemies,
+headshots, friendlies, occlusion and tight cover. The attraction values are
+initial tuning, not gameplay-validated.
+
+The feature uses the existing supported Modern OTS camera on PC/Android; the
+Switch/handheld configuration lacks that camera path and currently has no
+magnetism. Mouse/keyboard are excluded. Heavy/area, sniper, first-person and
+vehicle weapons are excluded; the older flamethrower area behavior is not
+claimed to have reticle/muzzle parity. The previous Modern Assisted snap, flick
+switch and unconditional friction were replaced by this one adjustable system;
+Off disables all of those additions. Free Aim applies 65% of the selected
+strength; Assisted applies the full strength. Loss of a retained target does not silently
+switch to another: release/re-aim or deliberately move the stick strongly to
+re-arm acquisition. Touch uses a separate, lighter tuning from a physical pad.
+
 ## Modern wheel input
 
 ```sh

@@ -1910,10 +1910,14 @@ RwV2d rightStickPos;
 // once a real gamepad takes over pad 0 -- gamepad1 is exactly the
 // SDL_GameController CaptureTouchPad()'s caller (CapturePad() below) yields
 // to when one is actually connected.
+bool AndroidPhysicalControllerConnected()
+{
+    return gamepad1 != nullptr && SDL_GameControllerGetAttached(gamepad1);
+}
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_revc_game_TouchControlsView_nativeIsControllerConnected(JNIEnv *env, jobject obj)
 {
-    return gamepad1 != nullptr && SDL_GameControllerGetAttached(gamepad1);
+    return AndroidPhysicalControllerConnected();
 }
 
 // Feeds the on-screen touch controls (TouchControls.cpp/TouchControlsView.java)

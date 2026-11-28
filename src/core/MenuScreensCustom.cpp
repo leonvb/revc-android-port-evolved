@@ -111,6 +111,7 @@ const char *modernFpsOpts[] = { "FEM_F30", "FEM_F60", "FEM_F90", "FEM_120", "FEM
 const char *modernDrivingStyles[] = { "FEM_CLS", "FEM_MDN" };
 const char *modernGpsOpts[] = { "FEM_OFF", "FEM_GPV", "FEM_ALW" };
 const char *modernAimOpts[] = { "FEM_CLS", "FEM_AFR", "FEM_AAS" };
+const char *modernMagnetismOpts[] = { "FEM_OFF", "FAM_LOW", "FAM_MED", "FAM_HIG" };
 const char *modernHapticsOpts[] = { "FEM_OFF", "FEM_SUB", "FEM_FUL" };
 const char *modernGyroOpts[] = { "FEM_OFF", "FEM_GAD", "FEM_ALW" };
 
@@ -866,6 +867,7 @@ CMenuScreenCustom aScreens[] = {
 		MENUACTION_CFO_SELECT,	"FEM_ASV", { new CCFOSelect(&CModernConfig::m_bAutosave, "Modern", "Autosave", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
 		MENUACTION_CFO_SELECT,	"FEM_VCM", { new CCFOSelect(&CModernConfig::m_bModernVehicleCam, "Modern", "ModernVehicleCam", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
 		MENUACTION_CFO_SELECT,	"FEM_AIM", { new CCFOSelect(&CModernConfig::m_nAimMode, "Modern", "AimMode", modernAimOpts, ARRAY_SIZE(modernAimOpts), false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
+		MENUACTION_CFO_SELECT,	"FEM_MAG", { new CCFOSelect(&CModernConfig::m_nAimMagnetism, "Modern", "AimMagnetism", modernMagnetismOpts, ARRAY_SIZE(modernMagnetismOpts), false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
 		MENUACTION_CFO_SELECT,	"FEM_WRW", { new CCFOSelect(&CModernConfig::m_bWeaponRadioWheels, "Modern", "WeaponRadioWheels", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
 #if defined(ANDROID)
 		MENUACTION_CFO_SELECT,	"FEM_HAP", { new CCFOSelect(&CModernConfig::m_nHapticsIntensity, "Modern", "HapticsIntensity", modernHapticsOpts, ARRAY_SIZE(modernHapticsOpts), false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,

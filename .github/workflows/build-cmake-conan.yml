@@ -43,6 +43,7 @@ jobs:
           python3 tests/test_frontend_text_fallback.py
           python3 tests/test_modern_vehicle_camera_contract.py
           python3 tests/test_modern_aim_contract.py
+          python3 tests/test_modern_magnetism_contract.py
           python3 tests/test_modern_ots_contract.py
           python3 tests/test_modern_wheels_contract.py
           python3 tests/test_modern_locomotion_contract.py
@@ -53,6 +54,10 @@ jobs:
           /tmp/modern_traversal_math
           c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=undefined tests/modern_vehicle_camera.cpp -o /tmp/modern_vehicle_camera
           /tmp/modern_vehicle_camera
+          c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=undefined tests/modern_aim_magnetism.cpp -o /tmp/modern_aim_magnetism
+          /tmp/modern_aim_magnetism
+          c++ -std=c++11 -Wall -Wextra -Werror -Wno-unused-parameter -fsanitize=undefined tests/modern_magnetism_pool.cpp -o /tmp/modern_magnetism_pool
+          /tmp/modern_magnetism_pool
           c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=undefined tests/modern_aim_geometry.cpp -o /tmp/modern_aim_geometry
           /tmp/modern_aim_geometry
           c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=undefined tests/modern_wheel_input.cpp -o /tmp/modern_wheel_input
@@ -69,7 +74,7 @@ jobs:
             -Ivendor/librw -Ivendor/sdl2/include src/core/Cam.cpp src/peds/PlayerPed.cpp src/core/Pad.cpp
           c++ -w -std=c++11 -fsyntax-only -DANDROID -Itests/android_stubs \
             -DRW_GL3 -DLIBRW_SDL2 -DLIBRW $INCLUDES \
-            -Ivendor/librw -Ivendor/sdl2/include src/peds/PlayerPed.cpp src/core/Pad.cpp
+            -Ivendor/librw -Ivendor/sdl2/include src/core/Cam.cpp src/peds/PlayerPed.cpp src/core/Pad.cpp
           for MODE in enabled disabled; do
             OPTS=""
             if [ "$MODE" = disabled ]; then OPTS=-DTEST_WITHOUT_MODERN_FEATURES; fi
