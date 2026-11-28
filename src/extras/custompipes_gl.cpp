@@ -481,8 +481,7 @@ worldRenderCB(rw::Atomic *atomic, rw::gl3::InstanceDataHeader *header)
 #else
 	const bool shadowActive = false;
 #endif
-	bool useModern = modernWorldShader && CModernConfig::m_bMasterEnable &&
-	                 (atomic->geometry->flags & Geometry::NORMALS) && !bRenderingEnvMap &&
+	bool useModern = modernWorldShader && CModernConfig::m_bMasterEnable && !bRenderingEnvMap &&
 	                 (shadowActive || CModernConfig::m_bDynamicPointLights ||
 	                  (modernRenderingRoad && CModernConfig::m_bWetRoadReflections && CWeather::WetRoads > 0.0f));
 #else
@@ -516,7 +515,8 @@ worldRenderCB(rw::Atomic *atomic, rw::gl3::InstanceDataHeader *header)
 		bool envAvailable = EnvMapTex && EnvMapHasFrame && VehiclePipeSwitch == VEHICLEPIPE_NEO;
 		float options[4] = { modernRenderingRoad && CModernConfig::m_bWetRoadReflections ?
 		                     Min(Max(CWeather::WetRoads, 0.0f), 1.0f) : 0.0f,
-		                     envAvailable ? 1.0f : 0.0f, 0.0f, 0.0f };
+		                     envAvailable ? 1.0f : 0.0f,
+		                     (atomic->geometry->flags & Geometry::NORMALS) ? 1.0f : 0.0f, 0.0f };
 		float sky[4] = { CTimeCycle::GetSkyBottomRed()/255.0f,
 		                 CTimeCycle::GetSkyBottomGreen()/255.0f,
 		                 CTimeCycle::GetSkyBottomBlue()/255.0f, 0.0f };
@@ -1060,7 +1060,6 @@ AtomicFirstPass(RpAtomic *atomic, int pass, bool road)
 #ifdef MODERN_FEATURES
 	const bool useModern = CustomPipes::modernWorldShader &&
 		CModernConfig::m_bMasterEnable && !CustomPipes::bRenderingEnvMap &&
-		(atomic->geometry->flags & rw::Geometry::NORMALS) &&
 		(CustomPipes::directionalShadowValid || CModernConfig::m_bDynamicPointLights ||
 		 (road && CModernConfig::m_bWetRoadReflections && CWeather::WetRoads > 0.0f));
 #else
@@ -1094,7 +1093,9 @@ AtomicFirstPass(RpAtomic *atomic, int pass, bool road)
 				V3d eye = rw::engine->currentCamera->getFrame()->getLTM()->pos;
 				glUniform3fv(U(CustomPipes::u_eye), 1, (float*)&eye);
 				bool env = CustomPipes::EnvMapTex && CustomPipes::EnvMapHasFrame && CustomPipes::VehiclePipeSwitch == CustomPipes::VEHICLEPIPE_NEO;
-				float options[4] = { road && CModernConfig::m_bWetRoadReflections ? Min(Max(CWeather::WetRoads, 0.0f), 1.0f) : 0.0f, env ? 1.0f : 0.0f, 0.0f, 0.0f };
+				float options[4] = { road && CModernConfig::m_bWetRoadReflections ? Min(Max(CWeather::WetRoads, 0.0f), 1.0f) : 0.0f,
+				                     env ? 1.0f : 0.0f,
+				                     (flags & Geometry::NORMALS) ? 1.0f : 0.0f, 0.0f };
 				float sky[4] = { CTimeCycle::GetSkyBottomRed()/255.0f, CTimeCycle::GetSkyBottomGreen()/255.0f, CTimeCycle::GetSkyBottomBlue()/255.0f, 0.0f };
 				float noLightmap[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 				glUniform4fv(U(CustomPipes::u_modernOptions), 1, options);

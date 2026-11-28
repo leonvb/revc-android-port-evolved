@@ -103,6 +103,9 @@ public:
 
 	static void ResetToClassicDefaults();
 	static void ApplyPreset(int8 preset);
+	// Called after the menu changes the master switch. Enabling directly from
+	// Classic activates the Modern preset; custom settings remain untouched.
+	static void OnMasterSwitchChanged(int8 before, int8 after);
 	static void MarkCustomPresetIfNeeded();
 	static void ClampValues();
 

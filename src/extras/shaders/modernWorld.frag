@@ -9,7 +9,7 @@ uniform vec3 u_eye;
 uniform vec4 u_modernPosition[8]; // xyz world center, w radius (0 = disabled)
 uniform vec4 u_modernColor[8];
 uniform vec4 u_modernDirection[8]; // xyz direction, w directional flag
-uniform vec4 u_modernOptions; // wetness, env available, unused, unused
+uniform vec4 u_modernOptions; // wetness, env available, has vertex normals, unused
 uniform vec4 u_modernSky; // rgb sky fallback
 FSIN vec4 v_color;
 FSIN vec2 v_tex0;
@@ -43,7 +43,19 @@ void main(void)
     vec4 color = diffuse * v_color * (1.0 + u_lightMap * (lm - 1.0));
     color.a = v_color.a * diffuse.a * u_lightMap.a;
     color.rgb *= shadowVisibility(v_worldPos);
-    vec3 N = v_worldNormal * inversesqrt(max(dot(v_worldNormal, v_worldNormal), 0.00001));
+    vec3 normal = v_worldNormal;
+    if(u_modernOptions.z < 0.5){
+#ifndef GL2
+        // GTA world meshes often have prelit colours but no vertex normals.
+        // Use the triangle's geometric normal for local lights and wet roads.
+        normal = cross(dFdx(v_worldPos), dFdy(v_worldPos));
+        if(!gl_FrontFacing) normal = -normal;
+#else
+        // GLES 2 derivatives are optional; leave local lighting disabled.
+        normal = vec3(0.0);
+#endif
+    }
+    vec3 N = normal * inversesqrt(max(dot(normal, normal), 0.00001));
     vec3 V = u_eye - v_worldPos;
     V *= inversesqrt(max(dot(V, V), 0.00001));
     vec3 added = vec3(0.0);

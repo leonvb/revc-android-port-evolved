@@ -28,4 +28,21 @@ int main()
 	CModernConfig::ApplyPreset(MODERN_PRESET_CLASSIC);
 	assert(CModernConfig::m_bMasterEnable == 0);
 	assert(CModernConfig::GetLodDistanceMultiplier() == 1.0f);
+
+	// Menu writes the new master value before invoking the callback.
+	CModernConfig::m_bMasterEnable = 1;
+	CModernConfig::OnMasterSwitchChanged(0, 1);
+	assert(CModernConfig::m_nPreset == MODERN_PRESET_MODERN);
+	assert(CModernConfig::m_bMasterEnable == 1);
+	assert(CModernConfig::m_nNeonBloom == 2 && CModernConfig::m_bFxaa == 1);
+	assert(CModernConfig::m_bDynamicPointLights == 1 && CModernConfig::m_bWetRoadReflections == 1);
+	assert(CModernConfig::m_nRealtimeShadows == 1);
+	CModernConfig::m_nNeonBloom = 0;
+	CModernConfig::MarkCustomPresetIfNeeded();
+	CModernConfig::m_bMasterEnable = 0;
+	CModernConfig::OnMasterSwitchChanged(1, 0);
+	CModernConfig::m_bMasterEnable = 1;
+	CModernConfig::OnMasterSwitchChanged(0, 1);
+	assert(CModernConfig::m_nPreset == MODERN_PRESET_CUSTOM);
+	assert(CModernConfig::m_nNeonBloom == 0 && CModernConfig::m_bFxaa == 1);
 }

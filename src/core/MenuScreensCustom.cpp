@@ -137,6 +137,12 @@ void ModernOptionAfterChange(int8 before, int8 after)
 	FrontEndMenuManager.SaveSettings();
 }
 
+void ModernMasterAfterChange(int8 before, int8 after)
+{
+	CModernConfig::OnMasterSwitchChanged(before, after);
+	FrontEndMenuManager.SaveSettings();
+}
+
 void RestoreDefModern(int8 action)
 {
 	if (action != FEOPTION_ACTION_SELECT)
@@ -873,7 +879,7 @@ CMenuScreenCustom aScreens[] = {
 	// MENUPAGE_MODERN_FEATURES
 	{ "FET_MOD", MENUPAGE_OPTIONS, new CCustomScreenLayout({40, 78, 25, true, true}), nil,
 		MENUACTION_CFO_SELECT,	"FEM_MPR", { new CCFOSelect(&CModernConfig::m_nPreset, "Modern", "Preset", modernPresets, ARRAY_SIZE(modernPresets), false, ModernPresetAfterChange) }, 0, 0, MENUALIGN_LEFT,
-		MENUACTION_CFO_SELECT,	"FEM_MMA", { new CCFOSelect(&CModernConfig::m_bMasterEnable, "Modern", "MasterEnable", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
+		MENUACTION_CFO_SELECT,	"FEM_MMA", { new CCFOSelect(&CModernConfig::m_bMasterEnable, "Modern", "MasterEnable", off_on, 2, false, ModernMasterAfterChange) }, 0, 0, MENUALIGN_LEFT,
 		MENUACTION_CFO_SELECT,	"FEM_TFP", { new CCFOSelect(&CModernConfig::m_nTargetFPS, "Modern", "TargetFPS", modernFpsOpts, ARRAY_SIZE(modernFpsOpts), false, ModernTargetFpsAfterChange) }, 0, 0, MENUALIGN_LEFT,
 		MENUACTION_CFO_SELECT,	"FEM_HFP", { new CCFOSelect(&CModernConfig::m_bHighFpsPhysicsFix, "Modern", "HighFpsPhysicsFix", off_on, 2, false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
 		MENUACTION_CFO_SELECT,	"FEM_DRV", { new CCFOSelect(&CModernConfig::m_nDrivingStyle, "Modern", "DrivingStyle", modernDrivingStyles, ARRAY_SIZE(modernDrivingStyles), false, ModernOptionAfterChange) }, 0, 0, MENUALIGN_LEFT,
