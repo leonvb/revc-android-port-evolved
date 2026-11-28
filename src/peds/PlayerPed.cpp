@@ -24,6 +24,11 @@
 #include "PedPlacement.h"
 #include "VarConsole.h"
 #include "SaveBuf.h"
+#ifdef MODERN_FEATURES
+#include "ModernConfig.h"
+#include "ModernWheels.h"
+#include "Frontend.h"
+#endif
 
 #define PAD_MOVE_TO_GAME_WORLD_MOVE 60.0f
 
@@ -713,11 +718,22 @@ CPlayerPed::PlayerControlSniper(CPad *padUsed)
 void
 CPlayerPed::ProcessWeaponSwitch(CPad *padUsed)
 {
+	bool cycleRight = false, cycleLeft = false;
+#ifdef MODERN_FEATURES
+	if (CModernWheels::InterceptWeapons()) {
+		int tap = CModernWheels::TakeWeaponTap();
+		cycleRight = tap > 0; cycleLeft = tap < 0;
+	} else
+#endif
+	{
+		cycleRight = padUsed->CycleWeaponRightJustDown();
+		cycleLeft = padUsed->CycleWeaponLeftJustDown();
+	}
 	if (CDarkel::FrenzyOnGoing() || m_attachedTo)
 		goto switchDetectDone;
 
 	if (!m_pPointGunAt && !bDontAllowWeaponChange && GetWeapon()->m_eWeaponType != WEAPONTYPE_DETONATOR) {
-		if (padUsed->CycleWeaponRightJustDown()) {
+		if (cycleRight) {
 
 			if (TheCamera.PlayerWeaponMode.Mode != CCam::MODE_M16_1STPERSON
 				&& TheCamera.PlayerWeaponMode.Mode != CCam::MODE_M16_1STPERSON_RUNABOUT
@@ -741,7 +757,7 @@ CPlayerPed::ProcessWeaponSwitch(CPad *padUsed)
 				goto switchDetectDone;
 #endif
 			}
-		} else if (padUsed->CycleWeaponLeftJustDown()) {
+		} else if (cycleLeft) {
 			if (TheCamera.PlayerWeaponMode.Mode != CCam::MODE_M16_1STPERSON
 				&& TheCamera.PlayerWeaponMode.Mode != CCam::MODE_SNIPER
 				&& TheCamera.PlayerWeaponMode.Mode != CCam::MODE_ROCKETLAUNCHER
@@ -1232,6 +1248,14 @@ CPlayerPed::ProcessAnimGroups(void)
 void
 CPlayerPed::ProcessPlayerWeapon(CPad *padUsed)
 {
+#ifdef MODERN_FEATURES
+	// Left stick click is crouch; use D-pad right while aiming for shoulder swap.
+	if (CModernConfig::IsModernAimActive() && padUsed->GetDPadRightJustDown()) {
+		CModernConfig::m_bRightShoulder = !CModernConfig::m_bRightShoulder;
+		CModernConfig::MarkCustomPresetIfNeeded();
+		FrontEndMenuManager.SaveSettings();
+	}
+#endif
 	CWeaponInfo *weaponInfo = CWeaponInfo::GetWeaponInfo(GetWeapon()->m_eWeaponType);
 	if (m_bHasLockOnTarget && !m_pPointGunAt) {
 		TheCamera.ClearPlayerWeaponMode();
@@ -1271,7 +1295,11 @@ CPlayerPed::ProcessPlayerWeapon(CPad *padUsed)
 			weapon == WEAPONTYPE_RUGER || weapon == WEAPONTYPE_M60 ||
 			weapon == WEAPONTYPE_CAMERA) {
 
-			if (padUsed->TargetJustDown() || TheCamera.m_bJustJumpedOutOf1stPersonBecauseOfTarget) {
+			if ((padUsed->TargetJustDown() || TheCamera.m_bJustJumpedOutOf1stPersonBecauseOfTarget)
+#ifdef MODERN_FEATURES
+			    && !CModernConfig::IsModernAimActive()
+#endif
+			    ) {
 #ifdef FREE_CAM
 				if (CCamera::bFreeCam && TheCamera.Cams[0].Using3rdPersonMouseCam()) {
 					m_fRotationCur = CGeneral::LimitRadianAngle(-TheCamera.Orientation);
@@ -1348,13 +1376,20 @@ CPlayerPed::ProcessPlayerWeapon(CPad *padUsed)
 	if (pointedGun == 2) pointedGun = 1;
 
 	// Rotate player/arm when shooting. We don't have auto-rotation anymore
-	if (CCamera::m_bUseMouse3rdPerson && CCamera::bFreeCam &&
-		m_nSelectedWepSlot == m_currentWeapon && m_nMoveState != PEDMOVE_SPRINT) {
+	if (((CCamera::m_bUseMouse3rdPerson && CCamera::bFreeCam)
+#ifdef MODERN_FEATURES
+		|| CModernConfig::IsModernAimActive()
+#endif
+		) && m_nSelectedWepSlot == m_currentWeapon && m_nMoveState != PEDMOVE_SPRINT) {
 
 #define CAN_AIM_WITH_ARM (weaponInfo->IsFlagSet(WEAPONFLAG_CANAIM_WITHARM) && !bIsDucking && !bCrouchWhenShooting)
 		// Weapons except throwable and melee ones
 		if (weaponInfo->m_nWeaponSlot > 2) {
-			if ((padUsed->GetTarget() && CAN_AIM_WITH_ARM) || padUsed->GetWeapon()) {
+			if ((padUsed->GetTarget() && (CAN_AIM_WITH_ARM
+#ifdef MODERN_FEATURES
+			    || CModernConfig::IsModernAimActive()
+#endif
+			    )) || padUsed->GetWeapon()) {
 				float limitedCam = CGeneral::LimitRadianAngle(-TheCamera.Orientation);
 
 				m_cachedCamSource = TheCamera.Cams[TheCamera.ActiveCam].Source;
@@ -1416,6 +1451,14 @@ CPlayerPed::ProcessPlayerWeapon(CPad *padUsed)
 	}
 #endif
 
+#ifdef MODERN_FEATURES
+	const bool modernAim = CModernConfig::IsModernAimActive();
+	if (modernAim && m_pPointGunAt)
+		ClearWeaponTarget();
+#else
+	const bool modernAim = false;
+#endif
+
 #if defined ANDROID
 	// m_bUseMouse3rdPerson doubles as "free camera look is active" for both
 	// mouse (PC) *and* the right stick (see Cam.cpp), so it can't just be
@@ -1423,12 +1466,12 @@ CPlayerPed::ProcessPlayerWeapon(CPad *padUsed)
 	// camera look, which needs it on. There is no mouse here at all, so
 	// only the mouse-specific meaning of the flag is wrong on Android;
 	// override it just for this target-lock gate, not the real flag.
-	const bool usingMouse3rdPerson = false;
+	const bool usingMouse3rdPerson = modernAim;
 #else
-	const bool usingMouse3rdPerson = CCamera::m_bUseMouse3rdPerson;
+	const bool usingMouse3rdPerson = CCamera::m_bUseMouse3rdPerson || modernAim;
 #endif
 
-	if (padUsed->GetTarget() && m_nSelectedWepSlot == m_currentWeapon && m_nMoveState != PEDMOVE_SPRINT && !TheCamera.Using1stPersonWeaponMode() && weaponInfo->IsFlagSet(WEAPONFLAG_CANAIM)) {
+	if (!modernAim && padUsed->GetTarget() && m_nSelectedWepSlot == m_currentWeapon && m_nMoveState != PEDMOVE_SPRINT && !TheCamera.Using1stPersonWeaponMode() && weaponInfo->IsFlagSet(WEAPONFLAG_CANAIM)) {
 		if (m_pPointGunAt) {
 			// what??
 			if (!m_pPointGunAt
@@ -1819,9 +1862,17 @@ CPlayerPed::ProcessControl(void)
 					if (padUsed)
 						PlayerControlSniper(padUsed);
 
-				} else if (TheCamera.Cams[0].Using3rdPersonMouseCam()
+				} else if ((TheCamera.Cams[0].Using3rdPersonMouseCam()
+#ifdef MODERN_FEATURES
+					|| CModernConfig::IsModernAimActive()
+#endif
+					)
 #ifdef FREE_CAM
-					&& !CCamera::bFreeCam
+					&& (!CCamera::bFreeCam
+#ifdef MODERN_FEATURES
+					    || CModernConfig::IsModernAimActive()
+#endif
+					    )
 #endif
 					) {
 					if (padUsed)

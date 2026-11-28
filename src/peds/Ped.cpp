@@ -1,4 +1,7 @@
 #include "common.h"
+#ifdef MODERN_FEATURES
+#include "ModernConfig.h"
+#endif
 
 #include "main.h"
 #include "Pools.h"
@@ -1447,7 +1450,11 @@ CPed::CalculateNewVelocity(void)
 		m_moved = m_moved * (1 / 100.0f);
 	}
 
-	if ((!TheCamera.Cams[TheCamera.ActiveCam].GetWeaponFirstPersonOn() && !TheCamera.Cams[0].Using3rdPersonMouseCam())
+	if ((!TheCamera.Cams[TheCamera.ActiveCam].GetWeaponFirstPersonOn() && !TheCamera.Cams[0].Using3rdPersonMouseCam()
+#ifdef MODERN_FEATURES
+		&& !CModernConfig::IsModernAimActive()
+#endif
+		)
 		|| FindPlayerPed() != this || !CanStrafeOrMouseControl()) {
 
 		if (FindPlayerPed() == this)
@@ -3906,7 +3913,11 @@ bool
 CPed::CanStrafeOrMouseControl(void)
 {
 #ifdef FREE_CAM
-	if (CCamera::bFreeCam)
+	if (CCamera::bFreeCam
+#ifdef MODERN_FEATURES
+	    && !(this == FindPlayerPed() && CModernConfig::IsModernAimActive())
+#endif
+	    )
 		return false;
 #endif
 	return m_nPedState == PED_NONE || m_nPedState == PED_IDLE || m_nPedState == PED_FLEE_POS || m_nPedState == PED_FLEE_ENTITY ||

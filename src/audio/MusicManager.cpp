@@ -1,4 +1,7 @@
 #include "common.h"
+#ifdef MODERN_FEATURES
+#include "ModernWheels.h"
+#endif
 #include <time.h>
 #include "soundlist.h"
 #include "MusicManager.h"
@@ -603,7 +606,18 @@ cMusicManager::ServiceGameMode()
 					}
 				}
 #endif
-				if (CPad::GetPad(0)->ChangeStationJustDown() && vehicle) {
+#ifdef MODERN_FEATURES
+				int wheelStation = CModernWheels::TakeRadioSelection();
+				if (wheelStation >= 0 && vehicle && !UsesPoliceRadio(vehicle) && !UsesTaxiRadio(vehicle)) {
+					gNumRetunePresses = (wheelStation - vehicle->m_nRadioStation + NUM_RADIOS + 1) % (NUM_RADIOS + 1);
+					gRetuneCounter = RETUNE_TIME;
+					RadioStaticCounter = 0;
+				}
+				bool changeStation = CModernWheels::InterceptRadio() ? CModernWheels::TakeRadioTap() : CPad::GetPad(0)->ChangeStationJustDown();
+#else
+				bool changeStation = CPad::GetPad(0)->ChangeStationJustDown();
+#endif
+				if (changeStation && vehicle) {
 					if (!UsesPoliceRadio(vehicle) && !UsesTaxiRadio(vehicle)) {
 						gNumRetunePresses++;
 						gRetuneCounter = RETUNE_TIME;

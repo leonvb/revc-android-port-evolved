@@ -1,5 +1,26 @@
 # 02 — Camera, Aiming & Combat Overhaul
 
+## Implementation status
+
+**Phase 3 implementation is in progress and requires gameplay verification.**
+Modern road-vehicle follow now supports manual-orbit delay, speed/reverse FOV,
+slope look-ahead and reverse swing. Supported on-foot firearms have OTS framing,
+D-pad-right shoulder swap, existing strafe/aim animation integration, a dynamic
+reticle, and camera-to-world/muzzle-to-world rays. Modern Assisted adds a short
+snap on aim and right-stick flick target selection; both modern modes have
+controller/touch reticle friction over visible hostile peds. The weapon and radio
+wheels use tap-to-cycle, hold-to-open and right-stick/touch selection, and give
+up time-scale ownership if another system changes it. Police/taxi radio,
+cutscenes, replays, scoped/special weapons and scripted cameras keep their
+existing paths. These integrations have not been tested in actual gameplay or on
+Android. The OTS route covers unscoped firearms including the minigun and flamethrower;
+the weapon wheel groups eight slots and leaves utility
+slots accessible through quick cycling. Flamethrower area-effect propagation
+still uses the original engine's collision behavior after the muzzle check.
+Treat the remaining acceptance criteria,
+including all weapons, crouch/strafe, interiors and special camera transitions,
+as unverified rather than complete.
+
 ## Overview & Goals
 Vice City's on-foot gunplay and camera feel dated primarily because:
 1. **Rifles & Heavy Weapons (`M4`, `Ruger`, `M60`, `Rocket`, `Sniper`)** force a stationary 1st-person mode where Tommy cannot walk or strafe (`MODE_M16_1STPERSON` / `PlayerControlM16`).

@@ -14,6 +14,9 @@ uint32 CTimer::m_snTimeInMillisecondsNonClipped;
 uint32 CTimer::m_snPreviousTimeInMilliseconds;
 uint32 CTimer::m_FrameCounter;
 float CTimer::ms_fTimeScale;
+#ifdef MODERN_FEATURES
+uint32 CTimer::m_TimeScaleRevision = 0;
+#endif
 float CTimer::ms_fTimeStep;
 float CTimer::ms_fTimeStepNonClipped;
 bool  CTimer::m_UserPause;
@@ -43,7 +46,7 @@ void CTimer::Initialise(void)
 {
 	debug("Initialising CTimer...\n");
 	
-	ms_fTimeScale = 1.0f;
+	SetTimeScale(1.0f);
 	ms_fTimeStep = 1.0f;
 	suspendDepth = 0;
 	m_UserPause = false;

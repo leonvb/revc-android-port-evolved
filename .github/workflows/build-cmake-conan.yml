@@ -41,6 +41,16 @@ jobs:
           python3 tests/test_radar_distance_contract.py
           python3 tests/test_scene_load_contract.py
           python3 tests/test_frontend_text_fallback.py
+          python3 tests/test_modern_vehicle_camera_contract.py
+          python3 tests/test_modern_aim_contract.py
+          python3 tests/test_modern_ots_contract.py
+          python3 tests/test_modern_wheels_contract.py
+          c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=undefined tests/modern_vehicle_camera.cpp -o /tmp/modern_vehicle_camera
+          /tmp/modern_vehicle_camera
+          c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=undefined tests/modern_aim_geometry.cpp -o /tmp/modern_aim_geometry
+          /tmp/modern_aim_geometry
+          c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=undefined tests/modern_wheel_input.cpp -o /tmp/modern_wheel_input
+          /tmp/modern_wheel_input
           INCLUDES=$(find src -type d -printf ' -I%p')
           for MODE in enabled disabled; do
             OPTS=""

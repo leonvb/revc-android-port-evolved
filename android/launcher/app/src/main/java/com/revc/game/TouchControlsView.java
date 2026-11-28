@@ -540,6 +540,10 @@ public class TouchControlsView extends View {
             placeCircle(BTN_DPAD_RIGHT, leftStick.center.x + shR * 2.6f, rowY - shR * 2.2f, shR);
             b(BTN_DPAD_LEFT).label = "←";
             b(BTN_DPAD_RIGHT).label = "→";
+        } else {
+            // D-pad right swaps shoulders only while modern aiming is active.
+            placeCircle(BTN_DPAD_RIGHT, leftStick.center.x + shR * 2.6f, rowY - shR * 2.2f, shR);
+            b(BTN_DPAD_RIGHT).label = "HOMBRO";
         }
 
         // Look behind (R3 -- CPad::GetLookBehindForPed() reads RightShock,

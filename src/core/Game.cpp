@@ -1,6 +1,7 @@
 #include "common.h"
 #ifdef MODERN_FEATURES
 #include "GpsRoute.h"
+#include "ModernWheels.h"
 #endif
 #include "platform.h"
 
@@ -593,6 +594,9 @@ bool CGame::Initialise(const char* datFile)
 
 bool CGame::ShutDown(void)
 {
+#ifdef MODERN_FEATURES
+	CModernWheels::Reset();
+#endif
 #ifdef USE_TEXTURE_POOL
 	_TexturePoolsUnknown(false);
 #endif
@@ -743,6 +747,7 @@ void CGame::ShutDownForRestart(void)
 {
 #ifdef MODERN_FEATURES
 	CGpsRoute::Reset();
+	CModernWheels::Reset();
 #endif
 #ifdef USE_TEXTURE_POOL
 	_TexturePoolsUnknown(false);
@@ -860,6 +865,9 @@ void CGame::Process(void)
 
 	if (!CCutsceneMgr::IsCutsceneProcessing() && !CTimer::GetIsCodePaused())
 		FrontEndMenuManager.Process();
+#ifdef MODERN_FEATURES
+	CModernWheels::Update();
+#endif
 
 	CTheZones::Update();
 #ifdef SECUROM

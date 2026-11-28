@@ -1,6 +1,8 @@
 #include "common.h"
 #ifdef MODERN_FEATURES
 #include "GpsRoute.h"
+#include "ModernConfig.h"
+#include "ModernWheels.h"
 #endif
 
 #include "Camera.h"
@@ -275,8 +277,40 @@ void CHud::Draw()
 			if (DrawCrossHairPC && TheCamera.Cams[TheCamera.ActiveCam].Using3rdPersonMouseCam()) {
 				float f3rdX = SCREEN_WIDTH * TheCamera.m_f3rdPersonCHairMultX;
 				float f3rdY = SCREEN_HEIGHT * TheCamera.m_f3rdPersonCHairMultY;
+#ifdef MODERN_FEATURES
+				if (CModernConfig::IsModernAimActive()) {
+					f3rdX = SCREEN_WIDTH * 0.5f;
+					f3rdY = SCREEN_HEIGHT * 0.5f;
+				}
+#endif
 #ifdef ASPECT_RATIO_SCALE
-				f3rdY -= SCREEN_SCALE_Y(2.0f);
+#ifdef MODERN_FEATURES
+				if (!CModernConfig::IsModernAimActive())
+#endif
+					f3rdY -= SCREEN_SCALE_Y(2.0f);
+#endif
+#ifdef MODERN_FEATURES
+				if (CModernConfig::IsModernAimActive()) {
+					const CCam &cam = TheCamera.Cams[TheCamera.ActiveCam];
+					CVector end = cam.Source + cam.Front * CWeaponInfo::GetWeaponInfo(playerPed->GetWeapon()->m_eWeaponType)->m_fRange;
+					CColPoint hit;
+					CEntity *entity = nil;
+					CEntity *oldIgnore = CWorld::pIgnoreEntity;
+					CWorld::pIgnoreEntity = playerPed;
+					bool blocked = CWorld::ProcessLineOfSight(cam.Source, end, hit, entity, true, true, true, true, true, false);
+					CWorld::pIgnoreEntity = oldIgnore;
+					CRGBA colour = blocked && entity && entity->IsPed() ? CRGBA(255, 95, 80, 230) : CRGBA(255, 255, 255, 220);
+					float movement = Min(playerPed->m_vecMoveSpeed.Magnitude2D() * 18.0f, 4.0f);
+					float firing = playerPed->GetWeapon()->m_eWeaponState == WEAPONSTATE_FIRING ? 3.0f : 0.0f;
+					float gap = 4.0f + movement + firing - (playerPed->bIsDucking ? 1.5f : 0.0f);
+					float gx = SCREEN_SCALE_X(gap), gy = SCREEN_SCALE_Y(gap);
+					float lx = SCREEN_SCALE_X(5.0f), ly = SCREEN_SCALE_Y(5.0f);
+					float tx = SCREEN_SCALE_X(1.0f), ty = SCREEN_SCALE_Y(1.0f);
+					CSprite2d::DrawRect(CRect(f3rdX-gx-lx, f3rdY-ty, f3rdX-gx, f3rdY+ty), colour);
+					CSprite2d::DrawRect(CRect(f3rdX+gx, f3rdY-ty, f3rdX+gx+lx, f3rdY+ty), colour);
+					CSprite2d::DrawRect(CRect(f3rdX-tx, f3rdY-gy-ly, f3rdX+tx, f3rdY-gy), colour);
+					CSprite2d::DrawRect(CRect(f3rdX-tx, f3rdY+gy, f3rdX+tx, f3rdY+gy+ly), colour);
+				} else
 #endif
 				if (playerPed && (WeaponType == WEAPONTYPE_M4 || WeaponType == WEAPONTYPE_RUGER || WeaponType == WEAPONTYPE_M60)) {
 					rect.left = f3rdX - SCREEN_SCALE_X(32.0f * 0.6f);
@@ -1435,6 +1469,9 @@ void CHud::Draw()
 			BigMessageInUse[2] = 0.0f;
 		}
 	}
+#ifdef MODERN_FEATURES
+	CModernWheels::Draw();
+#endif
 }
 
 void CHud::DrawAfterFade()

@@ -58,3 +58,48 @@ done
 ```
 
 This does not test actual language fonts or menu rendering on an Android device.
+
+## Modern vehicle camera (partial Phase 3)
+
+```sh
+python3 tests/test_modern_vehicle_camera_contract.py
+c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=undefined \
+  tests/modern_vehicle_camera.cpp -o /tmp/modern_vehicle_camera
+/tmp/modern_vehicle_camera
+```
+
+The host test covers orbit hold timing, FOV smoothing, reverse-view widening,
+reverse hysteresis and slope look-ahead at 30, 60 and 120 FPS, plus reset,
+invalid steps and long-frame clamping. It does not exercise in-game camera
+collision, scripted transitions, real controller/touch input or rendering;
+these require device testing. The reverse swing integration also needs in-game
+validation.
+
+## Modern third-person muzzle-ray groundwork
+
+```sh
+python3 tests/test_modern_aim_contract.py
+python3 tests/test_modern_ots_contract.py
+c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=undefined \
+  tests/modern_aim_geometry.cpp -o /tmp/modern_aim_geometry
+/tmp/modern_aim_geometry
+```
+
+These cover the muzzle-direction math and source-level activation guards, not
+engine collision queries or weapon gameplay. The two-stage ray currently applies
+only to supported third-person instant-hit and shotgun aim paths. OTS camera,
+strafing and aim assist require device validation.
+
+
+## Modern wheel input
+
+```sh
+python3 tests/test_modern_wheels_contract.py
+c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=undefined \
+  tests/modern_wheel_input.cpp -o /tmp/modern_wheel_input
+/tmp/modern_wheel_input
+```
+
+These tests cover the 180 ms boundary, sector selection, deadzone and clock
+wrap, plus source-level ownership and guard wiring. They do not exercise the
+actual HUD, controller, touch, audio, script time-scale or gameplay transitions.
