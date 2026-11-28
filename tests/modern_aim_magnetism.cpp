@@ -34,6 +34,16 @@ int main()
 	assert(Attraction(1.0f, 0.1f, 0.0f, high) == 0.0f);
 	assert(ConeWeight(RETAIN_CONE_DOT) == 0.0f && ConeWeight(1.0f) == 1.0f);
 	assert(ACQUIRE_CONE_DOT > RETAIN_CONE_DOT);
+	// CPed starts RANDOM_CHAR with bIsPlayerFriend=true, even for police.
+	// A pursuing cop must qualify; a bystander, follower, protected mission
+	// friend or non-hostile scripted character must not.
+	assert(IsEligibleRelationship(false, true, false, true)); // default cop, actively pursuing
+	assert(IsEligibleRelationship(false, false, false, true)); // hostile ordinary ped
+	assert(!IsEligibleRelationship(false, true, false, false)); // bystander
+	assert(!IsEligibleRelationship(false, true, true, true)); // follower
+	assert(!IsEligibleRelationship(true, true, false, true)); // mission friend
+	assert(!IsEligibleRelationship(true, false, false, false)); // non-hostile mission ped
+	assert(IsEligibleRelationship(true, false, false, true)); // hostile mission enemy
 	// Typical camera movement and diagonals must not trigger the override.
 	for (int axis = 50; axis <= 110; axis += 10) {
 		float input = InputAmount((float)axis, (float)axis, 1.0f, 1.0f);
@@ -66,6 +76,10 @@ int main()
 	// must acquire and keep a target while the player moves the stick normally.
 	// Previously 90/128 crossed the 0.70 override, constantly dropping it.
 	for (int fps : {30, 60, 120}) {
+		// The default random-cop friend bit and pursuit objective feed the same
+		// relationship policy used by both the scan and the retention check.
+		const bool pursuingCop = IsEligibleRelationship(false, true, false, true);
+		assert(pursuingCop);
 		State active; active.Reset();
 		float yaw = 0.0f;
 		float error = 0.06f;
@@ -73,7 +87,7 @@ int main()
 		for (int frame = 0; frame < fps; ++frame) {
 			assert(active.BeginFrame(true, input >= high.breakInput, 1.0f / fps));
 			if (active.CanAcquire()) active.Acquire(42);
-			assert(active.Visible(true, true, 1.0f / fps));
+			assert(active.Visible(pursuingCop, true, 1.0f / fps));
 			float weight = ConeWeight(cosf(error - yaw)) * ManualScale(input, high);
 			yaw += Attraction(error - yaw, 1.0f / fps, weight, high);
 		}

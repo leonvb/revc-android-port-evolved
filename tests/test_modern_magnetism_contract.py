@@ -8,6 +8,17 @@ ini = (root / 'src/core/re3.cpp').read_text()
 menu = (root / 'src/core/MenuScreensCustom.cpp').read_text()
 text = (root / 'src/text/Text.cpp').read_text()
 weapon = (root / 'src/weapons/Weapon.cpp').read_text()
+ped = (root / 'src/peds/Ped.cpp').read_text()
+cop = (root / 'src/peds/CopPed.cpp').read_text()
+# Engine facts behind the regression: random cops inherit the default friend bit.
+assert 'CharCreatedBy = RANDOM_CHAR;' in ped and 'bIsPlayerFriend = true;' in ped
+assert 'SetObjective(OBJECTIVE_KILL_CHAR_ON_FOOT, FindPlayerPed())' in cop
+candidate = cam.split('ModernMagnetismCandidate(', 1)[1].split('// A single scan', 1)[0]
+assert 'ModernAimMagnetism::IsEligibleRelationship(ped->CharCreatedBy == MISSION_CHAR,' in candidate
+assert 'ped->bIsPlayerFriend, ped->m_leader == player, hostile' in candidate
+assert 'ped->bIsPlayerFriend ||' not in candidate  # default bit is NOT an unconditional friend check
+assert 'ped->m_pedInObjective == player' in candidate
+assert 'ped->m_pPointGunAt == player' in candidate
 assert 'm_nAimMagnetism = MODERN_MAGNETISM_OFF' in config
 assert 'm_nAimMagnetism = MODERN_MAGNETISM_MEDIUM' in config
 assert 'm_nAimMagnetism > MODERN_MAGNETISM_HIGH' in config
@@ -31,7 +42,8 @@ for item in ('MODERN_MAGNETISM_OFF', 'controllerInput', '!UseMouse', 'aimDiscont
              'ModernAimMagnetism::ACQUIRE_CONE_DOT', 'ModernAimMagnetism::RETAIN_CONE_DOT',
              'magnet.BeginFrame', 'magnet.Visible',
              'aimPool->GetAt(magnet.target)', 'CPools::GetPedRef(ped)',
-             'ped->bIsPlayerFriend', 'ped->DyingOrDead()', 'ped->bNeverEverTargetThisPed',
+             'ModernAimMagnetism::IsEligibleRelationship', 'ped->CharCreatedBy == MISSION_CHAR',
+             'ped->bIsPlayerFriend', 'ped->m_leader == player', 'ped->DyingOrDead()', 'ped->bNeverEverTargetThisPed',
              'ModernMagnetismLineClear(chest, muzzle', 'ModernMagnetismLineClear(Source, magnetPoint',
              'ModernMagnetismLineClear(muzzle, magnetPoint', 'ModernAimMagnetism::BodyHeight',
              'ModernAimMagnetism::ShortestAngle', 'ModernAimMagnetism::Attraction'):

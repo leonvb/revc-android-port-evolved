@@ -93,6 +93,14 @@ inline Tuning ForAimMode(Tuning t, bool assisted)
 	if (!assisted) { t.friction *= 0.65f; t.rate *= 0.65f; t.maxRate *= 0.65f; }
 	return t;
 }
+// bIsPlayerFriend starts true for *all* peds, including random cops. The
+// game's protection rules interpret it for mission-created characters, while
+// normal peds must be classified by their actual hostile action/objective.
+inline bool IsEligibleRelationship(bool missionCreated, bool playerFriend,
+                                   bool followsPlayer, bool hostileToPlayer)
+{
+	return !followsPlayer && !(missionCreated && playerFriend) && hostileToPlayer;
+}
 inline bool InConeAndRange(float dot, float coneDot, float distanceSquared, float range)
 {
 	return range > 0.0f && distanceSquared >= 0.0f && distanceSquared <= range * range && dot >= coneDot;

@@ -100,7 +100,11 @@ gameplay validation and tuning. After initial user testing reported no felt
 magnetism, ordinary stick input was separated from full-deflection override,
 sensitivity scaling was accounted for, the acquisition cone and High response
 were increased, and peds actively attacking the player via `m_pSeekTarget`
-were included. This revision also needs on-device testing; it still deliberately
+were included. A subsequent user report revealed that `bIsPlayerFriend` starts
+true even for randomly spawned cops; unconditional rejection of the flag
+prevented acquiring them. The filter now follows the engine's mission-friend
+semantics while still requiring active hostility and excluding followers and
+protected targets. This fix still needs on-device validation; it deliberately
 excludes neutral bystanders.
 
 - Add **Aim Magnetism: Off / Low / Medium / High** to the Modernization menu and persisted Modern config; specify defaults explicitly (Classic preset Off; Modern preset Medium) and localize/fallback text. It is distinct from the existing Classic / Free / Assisted aim-mode choice: magnetism operates only during supported Modern aiming with an eligible input device, and Off is exactly the unmodified camera/aim path. Existing Assisted snap and friction must not stack twice; define how those features are scaled or replaced for each value.

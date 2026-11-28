@@ -130,13 +130,13 @@ ModernMagnetismCandidate(CPed *ped, CPlayerPed *player, const CVector &origin,
                          const CVector &forward, const CVector &muzzle,
                          float range, float coneDot, CVector &point, float &dot)
 {
-	if (!ped || ped == player || ped->DyingOrDead() || ped->bInVehicle || ped->bIsPlayerFriend ||
-	    ped->bNeverEverTargetThisPed || ped->m_leader == player)
+	if (!ped || ped == player || ped->DyingOrDead() || ped->bInVehicle || ped->bNeverEverTargetThisPed)
 		return false;
 	bool hostile = ped->m_pPointGunAt == player ||
 		(ped->m_nPedState == PED_ATTACK && ped->m_pSeekTarget == player) ||
 		((ped->m_objective == OBJECTIVE_KILL_CHAR_ON_FOOT || ped->m_objective == OBJECTIVE_KILL_CHAR_ANY_MEANS) && ped->m_pedInObjective == player);
-	if (!hostile) return false;
+	if (!ModernAimMagnetism::IsEligibleRelationship(ped->CharCreatedBy == MISSION_CHAR,
+		ped->bIsPlayerFriend, ped->m_leader == player, hostile)) return false;
 
 	// Nearest height on the body to the current reticle, rather than dragging
 	// a deliberate headshot down to a fixed centre point.

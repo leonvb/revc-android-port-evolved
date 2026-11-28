@@ -114,7 +114,8 @@ c++ -std=c++11 -Wall -Wextra -Werror -Wno-unused-parameter -fsanitize=undefined 
 /tmp/modern_magnetism_pool
 ```
 
-These cover moderate and diagonal stick movement, sensitivity scaling and
+These cover default random-cop friendship flags, hostility, mission-friend and
+follower exclusions, moderate and diagonal stick movement, sensitivity scaling and
 full-stick override (including a 30/60/120 FPS retention simulation), strength
 ordering, Off identity, bounded and FPS-independent math,
 angle wrap, nearest-body height, acquisition scoring/range, override cooldown,
