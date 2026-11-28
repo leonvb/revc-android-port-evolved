@@ -6,6 +6,7 @@ removed_symbols = (
     'm_bExperimentalEdgeAA', 'm_bDynamicPointLights',
     'm_bWetRoadReflections', 'm_nRealtimeShadows',
     'ModernVisualPolicy', 'ModernRenderDiagnostics',
+    'GetModernPopulationHorizon', 'GetModernLodMultiplier',
     'RenderDirectionalShadowMap', 'RenderModernBloom',
     'RenderExperimentalEdgeAA', 'modernWorldShader',
 )
