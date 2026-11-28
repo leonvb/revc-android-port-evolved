@@ -36,3 +36,25 @@ c++ -w -std=c++11 -pthread -ffunction-sections -fdata-sections \
 timeout 30 /tmp/android_cdstream
 python3 tests/test_scene_load_contract.py
 ```
+
+## Custom frontend text fallback
+
+These host tests exercise missing custom menu keys, main/mission translation
+precedence and simultaneous fallback strings. The source check also verifies all
+reVC additions match `utils/gxt/american.txt`. No game assets are overwritten.
+
+```sh
+python3 tests/test_frontend_text_fallback.py
+INCLUDES=$(find src -type d -printf ' -I%p')
+for MODE in enabled disabled; do
+  OPTS=""
+  if [ "$MODE" = disabled ]; then OPTS=-DTEST_WITHOUT_MODERN_FEATURES; fi
+  c++ -w -std=c++11 -ffunction-sections -fdata-sections \
+    -DRW_GL3 -DLIBRW_SDL2 -DLIBRW $OPTS $INCLUDES \
+    -Ivendor/librw -Ivendor/sdl2/include tests/frontend_text_fallback.cpp \
+    -Wl,--gc-sections -o /tmp/frontend_text_fallback
+  /tmp/frontend_text_fallback
+done
+```
+
+This does not test actual language fonts or menu rendering on an Android device.

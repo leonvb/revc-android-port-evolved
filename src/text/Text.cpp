@@ -130,9 +130,9 @@ CText::Unload(void)
 	memset(szMissionTableName, 0, sizeof(szMissionTableName));
 }
 
-#ifdef MODERN_FEATURES
+#ifdef CUSTOM_FRONTEND_OPTIONS
 static wchar *
-LookupModernFallbackText(const char *key)
+LookupFrontendFallbackText(const char *key)
 {
 	if (!key || key[0] == '\0')
 		return nil;
@@ -142,6 +142,58 @@ LookupModernFallbackText(const char *key)
 		const char *text;
 	};
 	static const FallbackEntry fallbacks[] = {
+		// reVC menu additions, for original or incomplete language GXT files.
+		{ "FEL_JAP", "JAPANESE" },
+		{ "FEL_POL", "POLISH" },
+		{ "FEL_RUS", "RUSSIAN" },
+		{ "FET_GFX", "GRAPHICS SETUP" },
+		{ "FED_MIP", "MIP MAPPING" },
+		{ "FED_AAS", "ANTI ALIASING" },
+		{ "FED_FIL", "TEXTURE FILTERING" },
+		{ "FED_BIL", "BILINEAR" },
+		{ "FED_TRL", "TRILINEAR" },
+		{ "FED_WND", "WINDOWED" },
+		{ "FED_FLS", "FULLSCREEN" },
+		{ "FEM_CSB", "CUTSCENE BORDERS" },
+		{ "FEM_SCF", "SCREEN FORMAT" },
+		{ "FEM_ISL", "MAP MEMORY USAGE" },
+		{ "FEM_LOW", "LOW" },
+		{ "FEM_MED", "MEDIUM" },
+		{ "FEM_HIG", "HIGH" },
+		{ "FEM_2PR", "PS2 ALPHA TEST" },
+		{ "FEC_FRC", "FREE CAM" },
+		{ "FEC_JOD", "DETECT JOYSTICK" },
+		{ "FEC_JPR", "Press any key on the joystick of your choice that you want to use on the game, and it will be selected." },
+		{ "FEC_JDE", "Detected joystick" },
+		{ "FET_RMS", "REPLAY MISSION" },
+		{ "FESZ_RM", "RETRY?" },
+		{ "FED_VPL", "VEHICLE PIPELINE" },
+		{ "FED_PRM", "PED RIM LIGHT" },
+		{ "FED_RGL", "ROAD GLOSS" },
+		{ "FED_CLF", "COLOUR FILTER" },
+		{ "FED_WLM", "WORLD LIGHTMAPS" },
+		{ "FED_MBL", "MOTION BLUR" },
+		{ "FEM_SIM", "SIMPLE" },
+		{ "FEM_NRM", "NORMAL" },
+		{ "FEM_MOB", "MOBILE" },
+		{ "FED_MFX", "MATFX" },
+		{ "FED_NEO", "NEO" },
+		{ "FEM_PS2", "PS2" },
+		{ "FEM_XBX", "XBOX" },
+		{ "FEC_IVP", "INVERT PAD VERTICALLY" },
+		{ "FEM_NON", "NONE" },
+		{ "FEC_DS2", "DUALSHOCK 2" },
+		{ "FEC_DS3", "DUALSHOCK 3" },
+		{ "FEC_DS4", "DUALSHOCK 4" },
+		{ "FEC_360", "XBOX 360 CONTROLLER" },
+		{ "FEC_ONE", "XBOX ONE CONTROLLER" },
+		{ "FEC_NSW", "NINTENDO SWITCH CONTROLLER" },
+		{ "FEC_TYP", "GAMEPAD TYPE" },
+		{ "FET_AGS", "GAMEPAD SETTINGS" },
+		{ "FEM_AUT", "AUTO" },
+		{ "FEM_PED", "PED DENSITY" },
+		{ "FEM_CAR", "CAR DENSITY" },
+#ifdef MODERN_FEATURES
 		{ "FEO_MOD", "Modernization" },
 		{ "FET_MOD", "MODERNIZATION" },
 		{ "FEM_MPR", "MODERN PRESET" },
@@ -176,11 +228,12 @@ LookupModernFallbackText(const char *key)
 		{ "FEM_SUB", "SUBTLE" },
 		{ "FEM_FUL", "FULL" },
 		{ "FEM_GAD", "WHILE AIMING" },
+#endif
 	};
 
 	// Use an 8-slot ring buffer so multiple CText::Get() calls in the same expression
 	// or draw pass (e.g. leftText + rightText + header) never clobber one another.
-	static wchar ringBuf[8][40];
+	static wchar ringBuf[8][128];
 	static uint32 ringIdx = 0;
 
 	for (size_t i = 0; i < sizeof(fallbacks) / sizeof(fallbacks[0]); i++) {
@@ -188,7 +241,7 @@ LookupModernFallbackText(const char *key)
 			wchar *dst = ringBuf[ringIdx++ & 7];
 			const char *src = fallbacks[i].text;
 			size_t j = 0;
-			while (src[j] != '\0' && j < 39) {
+			while (src[j] != '\0' && j < 127) {
 				dst[j] = (unsigned char)src[j];
 				j++;
 			}
@@ -217,9 +270,9 @@ CText::Get(const char *key)
 		outstr = mission_keyArray.Search(key, &result);
 #endif
 
-#ifdef MODERN_FEATURES
+#ifdef CUSTOM_FRONTEND_OPTIONS
 	if (!result) {
-		wchar *fallback = LookupModernFallbackText(key);
+		wchar *fallback = LookupFrontendFallbackText(key);
 		if (fallback)
 			return fallback;
 	}
