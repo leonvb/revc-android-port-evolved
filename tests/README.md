@@ -103,3 +103,26 @@ c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=undefined \
 These tests cover the 180 ms boundary, sector selection, deadzone and clock
 wrap, plus source-level ownership and guard wiring. They do not exercise the
 actual HUD, controller, touch, audio, script time-scale or gameplay transitions.
+
+## Modern locomotion groundwork (partial Phase 5)
+
+```sh
+python3 tests/test_modern_locomotion_contract.py
+c++ -std=c++11 -Wall -Wextra -Werror -fsanitize=undefined \
+  tests/modern_traversal_math.cpp -o /tmp/modern_traversal_math
+/tmp/modern_traversal_math
+```
+
+The host test covers the reversal timing at 30, 60 and 120 FPS, low-speed
+turns and reset on neutral input. The contract checks configuration, script,
+player and rollout guards. Neither test exercises real player animations,
+controller input, car bailouts or mission behavior. Stock sprint already uses
+held input; the hold-to-sprint setting gates the new pivot and rollout recovery,
+not a new sprint input mode. The pivot is currently wired to Zelda-style
+third-person controls, not the first-person/fighter control paths.
+
+Swimming, shore/dock/boat recovery and mantling remain unimplemented. A height
+cap and a generic collision probe are not sufficient to guarantee mission and
+island gating, especially because swimming itself could go around a bridge.
+Those features require a reliable way to enforce script-controlled access and
+playtesting with the original game assets before they can be enabled safely.
