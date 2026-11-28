@@ -114,7 +114,9 @@ c++ -std=c++11 -Wall -Wextra -Werror -Wno-unused-parameter -fsanitize=undefined 
 /tmp/modern_magnetism_pool
 ```
 
-These cover strength ordering, Off identity, bounded and FPS-independent math,
+These cover moderate and diagonal stick movement, sensitivity scaling and
+full-stick override (including a 30/60/120 FPS retention simulation), strength
+ordering, Off identity, bounded and FPS-independent math,
 angle wrap, nearest-body height, acquisition scoring/range, override cooldown,
 visibility grace and no automatic target hopping. The pool test uses the actual
 pool generation handles for deletion and slot reuse. Source contracts check the

@@ -134,6 +134,7 @@ ModernMagnetismCandidate(CPed *ped, CPlayerPed *player, const CVector &origin,
 	    ped->bNeverEverTargetThisPed || ped->m_leader == player)
 		return false;
 	bool hostile = ped->m_pPointGunAt == player ||
+		(ped->m_nPedState == PED_ATTACK && ped->m_pSeekTarget == player) ||
 		((ped->m_objective == OBJECTIVE_KILL_CHAR_ON_FOOT || ped->m_objective == OBJECTIVE_KILL_CHAR_ANY_MEANS) && ped->m_pedInObjective == player);
 	if (!hostile) return false;
 
@@ -161,7 +162,7 @@ FindModernAimThreat(CPlayerPed *player, const CVector &origin, const CVector &fo
 	CPedPool *pool = CPools::GetPedPool();
 	if (!pool) return -1;
 	int32 best = -1;
-	bestDot = 0.9961947f; // acquisition cone: 5 degrees
+	bestDot = ModernAimMagnetism::ACQUIRE_CONE_DOT;
 	for (int i = 0; i < pool->GetSize(); ++i) {
 		CPed *ped = pool->GetSlot(i);
 		CVector candidate;
@@ -1580,9 +1581,8 @@ CCam::Process_FollowPedWithMouse(const CVector &CameraTarget, float TargetOrient
 		ModernAimMagnetism::Tuning tuning = ModernAimMagnetism::ForAimMode(
 			ModernAimMagnetism::GetTuning(CModernConfig::m_nAimMagnetism, touch),
 			CModernConfig::m_nAimMode == MODERN_AIM_ASSISTED);
-		float inputX = aimPad->GetRightStickX() / 128.0f;
-		float inputY = aimPad->GetRightStickY() / 128.0f;
-		float inputAmount = Min(1.0f, Sqrt(inputX * inputX + inputY * inputY));
+		float inputAmount = ModernAimMagnetism::InputAmount(aimPad->GetRightStickX(), aimPad->GetRightStickY(),
+			ControlsManager.m_rStickSensX, ControlsManager.m_rStickSensY);
 		float dt = CTimer::GetTimeStepInSeconds();
 		bool eligible = aiming && !aimDiscontinuity && this == &TheCamera.Cams[TheCamera.ActiveCam] &&
 			controllerInput && CModernConfig::m_nAimMagnetism != MODERN_MAGNETISM_OFF &&
@@ -1607,7 +1607,7 @@ CCam::Process_FollowPedWithMouse(const CVector &CameraTarget, float TargetOrient
 					int index = magnet.target >> 8;
 					CPed *ped = index >= 0 && index < aimPool->GetSize() ? aimPool->GetAt(magnet.target) : nil;
 					bool valid = ModernMagnetismCandidate(ped, aimPlayer, Source, fwd, muzzle,
-						info->m_fRange, 0.9902681f, magnetPoint, dot); // 8-degree retention cone
+						info->m_fRange, ModernAimMagnetism::RETAIN_CONE_DOT, magnetPoint, dot);
 					bool clear = valid && muzzleClear && ModernMagnetismLineClear(Source, magnetPoint, aimPlayer, ped) &&
 						ModernMagnetismLineClear(muzzle, magnetPoint, aimPlayer, ped);
 					visible = magnet.Visible(valid, clear, dt);
@@ -1617,7 +1617,7 @@ CCam::Process_FollowPedWithMouse(const CVector &CameraTarget, float TargetOrient
 					if (target != -1) { magnet.Acquire(target); visible = true; }
 				}
 				if (visible) {
-					float manualScale = Clamp((tuning.breakInput - inputAmount) / 0.30f, 0.0f, 1.0f);
+					float manualScale = ModernAimMagnetism::ManualScale(inputAmount, tuning);
 					magnetWeight = ModernAimMagnetism::ConeWeight(dot) * manualScale;
 					float friction = 1.0f - tuning.friction * magnetWeight;
 					LookLeftRight *= friction;

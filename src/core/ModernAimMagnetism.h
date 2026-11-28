@@ -54,18 +54,38 @@ struct State {
 struct Tuning { float friction, rate, maxRate, breakInput; };
 inline Tuning GetTuning(int strength, bool touch)
 {
-	// Touch is slightly less aggressive because virtual stick travel is shorter.
+	// Full-stick deflection is an escape gesture, not ordinary camera movement.
+	// Keep an appreciable response throughout the normal range of stick travel.
 	static const Tuning levels[] = {
-		{ 0.0f, 0.0f, 0.0f, 0.70f },
-		{ 0.12f, 0.8f, 0.20f, 0.70f },
-		{ 0.24f, 1.4f, 0.35f, 0.70f },
-		{ 0.36f, 2.2f, 0.50f, 0.70f },
+		{ 0.0f, 0.0f, 0.0f, 0.97f },
+		{ 0.16f, 1.0f, 0.22f, 0.97f },
+		{ 0.32f, 1.9f, 0.38f, 0.97f },
+		{ 0.52f, 3.2f, 0.60f, 0.97f },
 	};
 	if (strength < 0 || strength > 3) strength = 0;
 	Tuning t = levels[strength];
-	if (touch) { t.friction *= 0.8f; t.rate *= 0.8f; t.maxRate *= 0.8f; t.breakInput = 0.65f; }
+	if (touch) { t.friction *= 0.9f; t.rate *= 0.9f; t.maxRate *= 0.9f; t.breakInput = 0.94f; }
 	return t;
 }
+
+// Input arrives after per-axis controller sensitivity scaling. Undo it before
+// detecting a deliberate full-stick override; a high sensitivity setting must
+// not make every moderate movement look like a full deflection. Max-axis
+// rather than radial magnitude also keeps ordinary diagonals from breaking aim.
+inline float InputAmount(float x, float y, float sensitivityX, float sensitivityY)
+{
+	float sx = fabsf(sensitivityX), sy = fabsf(sensitivityY);
+	if (sx < 0.01f) sx = 1.0f;
+	if (sy < 0.01f) sy = 1.0f;
+	return fminf(1.0f, fmaxf(fabsf(x) / (128.0f * sx), fabsf(y) / (128.0f * sy)));
+}
+inline float ManualScale(float input, const Tuning &t)
+{
+	return fmaxf(0.0f, fminf(1.0f, (t.breakInput - input) / 0.20f));
+}
+
+static const float ACQUIRE_CONE_DOT = 0.9925462f; // 7 degrees
+static const float RETAIN_CONE_DOT = 0.9848078f; // 10 degrees
 
 inline Tuning ForAimMode(Tuning t, bool assisted)
 {
@@ -83,8 +103,8 @@ inline float BodyHeight(float rayHeight, float pedHeight, bool ducking)
 }
 inline float ConeWeight(float dot)
 {
-	// Fade smoothly to zero at the 8-degree retention boundary.
-	const float edge = 0.9902681f;
+	// Fade smoothly to zero at the 10-degree retention boundary.
+	const float edge = RETAIN_CONE_DOT;
 	float weight = (dot - edge) / (1.0f - edge);
 	return fmaxf(0.0f, fminf(1.0f, weight));
 }
