@@ -1,19 +1,5 @@
-"""Source-level guards for the suspended horizon and bottom-left radar.
-
-These complement the policy tests; they do not replace on-device rendering.
-"""
+"""Source-level guards for bottom-left radar and GPS placement."""
 from pathlib import Path
-
-config = Path('src/core/ModernConfig.cpp').read_text()
-getter = config.split('CModernConfig::GetLodDistanceMultiplier()', 1)[1].split('\n}', 1)[0]
-assert 'ModernVisualPolicy::ActiveLodMultiplier(m_bMasterEnable != 0, m_fLodDistMultiplier)' in getter
-preset = config.split('if (preset == MODERN_PRESET_MODERN)', 1)[1].split('} else {', 1)[0]
-assert 'm_fLodDistMultiplier = 1.0f;' in preset
-menu = Path('src/core/MenuScreensCustom.cpp').read_text()
-assert '"FEM_LDM"' not in menu
-camera = Path('src/core/Camera.cpp').read_text()
-assert 'CModernConfig::GetLodDistanceMultiplier()' in camera
-assert 'LODDistMultiplier *= GetModernLodMultiplier();' in camera
 
 radar = Path('src/core/Radar.cpp').read_text()
 transform = radar.split('void CRadar::TransformRadarPointToScreenSpace', 1)[1].split('\n}', 1)[0]

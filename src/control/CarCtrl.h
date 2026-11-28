@@ -69,7 +69,7 @@ public:
 	static void ScanForPedDanger(CVehicle *veh);
 	static void RemoveFromInterestingVehicleList(CVehicle*);
 	static void GenerateRandomCars(void);
-	static void GenerateOneRandomCar(bool initialBatch = false);
+	static void GenerateOneRandomCar(void);
 	static void GenerateEmergencyServicesCar(void);
 	static int32 ChooseModel(CZoneInfo*, int*);
 	static int32 ChoosePoliceCarModel(void);

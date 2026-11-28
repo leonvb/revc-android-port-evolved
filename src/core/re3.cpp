@@ -600,13 +600,6 @@ bool LoadINISettings()
 	ReadIniIfExists("Modern", "Swimming", &CModernConfig::m_bSwimming);
 	ReadIniIfExists("Modern", "LedgeMantling", &CModernConfig::m_bLedgeMantling);
 	ReadIniIfExists("Modern", "MaxMantleHeight", &CModernConfig::m_fMaxMantleHeight);
-	ReadIniIfExists("Modern", "LodDistMultiplier", &CModernConfig::m_fLodDistMultiplier);
-	ReadIniIfExists("Modern", "NeonBloom", &CModernConfig::m_nNeonBloom);
-	ReadIniIfExists("Modern", "FXAA", &CModernConfig::m_bFxaa);
-	ReadIniIfExists("Modern", "ExperimentalEdgeAA", &CModernConfig::m_bExperimentalEdgeAA);
-	ReadIniIfExists("Modern", "DynamicPointLights", &CModernConfig::m_bDynamicPointLights);
-	ReadIniIfExists("Modern", "WetRoadReflections", &CModernConfig::m_bWetRoadReflections);
-	ReadIniIfExists("Modern", "RealtimeShadows", &CModernConfig::m_nRealtimeShadows);
 #endif
 
 #ifdef CUSTOM_FRONTEND_OPTIONS
@@ -743,13 +736,6 @@ void SaveINISettings()
 	StoreIni("Modern", "Swimming", CModernConfig::m_bSwimming);
 	StoreIni("Modern", "LedgeMantling", CModernConfig::m_bLedgeMantling);
 	StoreIni("Modern", "MaxMantleHeight", CModernConfig::m_fMaxMantleHeight);
-	StoreIni("Modern", "LodDistMultiplier", CModernConfig::m_fLodDistMultiplier);
-	StoreIni("Modern", "NeonBloom", CModernConfig::m_nNeonBloom);
-	StoreIni("Modern", "FXAA", CModernConfig::m_bFxaa);
-	StoreIni("Modern", "ExperimentalEdgeAA", CModernConfig::m_bExperimentalEdgeAA);
-	StoreIni("Modern", "DynamicPointLights", CModernConfig::m_bDynamicPointLights);
-	StoreIni("Modern", "WetRoadReflections", CModernConfig::m_bWetRoadReflections);
-	StoreIni("Modern", "RealtimeShadows", CModernConfig::m_nRealtimeShadows);
 #endif
 #ifdef CUSTOM_FRONTEND_OPTIONS
 	for (int i = 0; i < MENUPAGES; i++) {

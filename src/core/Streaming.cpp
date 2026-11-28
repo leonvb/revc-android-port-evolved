@@ -1,8 +1,4 @@
 #include "common.h"
-#if defined(MODERN_FEATURES) && UINTPTR_MAX > UINT32_MAX && !defined(__SWITCH__) && defined(GTA_PC)
-#include "ModernConfig.h"
-#include "ModernVisualPolicy.h"
-#endif
 
 #include "General.h"
 #include "Pad.h"
@@ -77,20 +73,6 @@ int32 CStreaming::ms_imageOffsets[NUMCDIMAGES];
 int32 CStreaming::ms_lastImageRead;
 int32 CStreaming::ms_imageSize;
 size_t CStreaming::ms_memoryAvailable;
-
-#if defined(MODERN_FEATURES) && UINTPTR_MAX > UINT32_MAX && !defined(__SWITCH__) && defined(GTA_PC)
-namespace {
-size_t classicStreamingBudget;
-size_t modernStreamingBudget;
-
-void ApplyModernStreamingBudget()
-{
-	if (classicStreamingBudget)
-		CStreaming::ms_memoryAvailable = CModernConfig::m_bMasterEnable && modernStreamingBudget
-			? modernStreamingBudget : classicStreamingBudget;
-}
-}
-#endif
 
 int32 desiredNumVehiclesLoaded = 12;
 
@@ -262,15 +244,6 @@ CStreaming::Init2(void)
 #undef MB
 #endif
 
-#if defined(MODERN_FEATURES) && UINTPTR_MAX > UINT32_MAX && !defined(__SWITCH__) && defined(GTA_PC)
-	classicStreamingBudget = ms_memoryAvailable;
-	// Use only startup free-memory information already available on desktop and
-	// Android. Retain the existing 65 MB minimum when memory is scarce.
-	extern size_t _dwMemAvailPhys;
-	modernStreamingBudget = ModernVisualPolicy::EffectiveStreamingBudget(classicStreamingBudget, _dwMemAvailPhys);
-	ApplyModernStreamingBudget();
-#endif
-
 	// find island LODs
 
 	pIslandLODmainlandEntity = nil;
@@ -355,9 +328,6 @@ CStreaming::Update(void)
 	timeProcessingDFF = 0;
 #endif
 
-#if defined(MODERN_FEATURES) && UINTPTR_MAX > UINT32_MAX && !defined(__SWITCH__) && defined(GTA_PC)
-	ApplyModernStreamingBudget();
-#endif
 	UpdateMemoryUsed();
 
 	if(ms_channelError != -1){

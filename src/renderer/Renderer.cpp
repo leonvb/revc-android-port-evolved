@@ -25,9 +25,6 @@
 #include "Renderer.h"
 #include "custompipes.h"
 #include "Frontend.h"
-#ifdef MODERN_FEATURES
-#include "ModernVisualPolicy.h"
-#endif
 
 bool gbShowPedRoadGroups;
 bool gbShowCarRoadGroups;
@@ -56,14 +53,14 @@ struct EntityInfo
 CLinkList<EntityInfo> gSortedVehiclesAndPeds;
 
 int32 CRenderer::ms_nNoOfVisibleEntities;
-CEntity *CRenderer::ms_aVisibleEntityPtrs[RENDER_VISIBLE_CAPACITY];
+CEntity *CRenderer::ms_aVisibleEntityPtrs[NUMVISIBLEENTITIES];
 CEntity *CRenderer::ms_aInVisibleEntityPtrs[NUMINVISIBLEENTITIES];
 int32 CRenderer::ms_nNoOfInVisibleEntities;
 #ifdef NEW_RENDERER
 int32 CRenderer::ms_nNoOfVisibleVehicles;
-CEntity *CRenderer::ms_aVisibleVehiclePtrs[RENDER_VISIBLE_CAPACITY];
+CEntity *CRenderer::ms_aVisibleVehiclePtrs[NUMVISIBLEENTITIES];
 int32 CRenderer::ms_nNoOfVisibleBuildings;
-CEntity *CRenderer::ms_aVisibleBuildingPtrs[RENDER_VISIBLE_CAPACITY];
+CEntity *CRenderer::ms_aVisibleBuildingPtrs[NUMVISIBLEENTITIES];
 #endif
 
 CVUVECTOR CRenderer::ms_vecCameraPosition;
@@ -127,25 +124,6 @@ CRenderer::PreRender(void)
 	CHeli::SpecialHeliPreRender();
 	CShadows::RenderExtraPlayerShadows();
 }
-
-#if defined(MODERN_FEATURES) && defined(RW_GL3) && defined(EXTENDED_PIPELINES)
-void
-CRenderer::ForEachShadowCandidate(void (*visit)(CEntity *, void *), void *data)
-{
-	for(int i = 0; i < ms_nNoOfVisibleEntities; ++i)
-		visit(ms_aVisibleEntityPtrs[i], data);
-	for(int i = 0; i < ms_nNoOfInVisibleEntities; ++i)
-		visit(ms_aInVisibleEntityPtrs[i], data);
-#ifdef NEW_RENDERER
-	if(gbNewRenderer){
-		for(int i = 0; i < ms_nNoOfVisibleBuildings; ++i)
-			visit(ms_aVisibleBuildingPtrs[i], data);
-		for(int i = 0; i < ms_nNoOfVisibleVehicles; ++i)
-			visit(ms_aVisibleVehiclePtrs[i], data);
-	}
-#endif
-}
-#endif
 
 void
 CRenderer::RenderOneRoad(CEntity *e)
@@ -450,7 +428,7 @@ CRenderer::RenderOneBuilding(CEntity *ent, float camdist)
 		alpha = mi->m_alpha * fadefactor;
 
 		if(alpha == 255)
-			WorldRender::AtomicFirstPass(atomic, pass, IsRoad(ent));
+			WorldRender::AtomicFirstPass(atomic, pass);
 		else{
 			// not quite sure what this is about, do we have to do that?
 			RpGeometry *geo = RpAtomicGetGeometry(lodatm);
@@ -459,7 +437,7 @@ CRenderer::RenderOneBuilding(CEntity *ent, float camdist)
 			WorldRender::AtomicFullyTransparent(atomic, pass, alpha);
 		}
 	}else
-		WorldRender::AtomicFirstPass(atomic, pass, IsRoad(ent));
+		WorldRender::AtomicFirstPass(atomic, pass);
 
 	ent->bImBeingRendered = false;	// TODO: this seems wrong, but do we even need it?
 }
@@ -781,25 +759,6 @@ CRenderer::SetupEntityVisibility(CEntity *ent)
 		mi->m_isDamaged = true;
 
 	RpAtomic *a = mi->GetAtomicFromDistance(dist);
-#ifdef MODERN_FEATURES
-	// Reuse the current instance geometry within a small LOD boundary band.
-	// Damage models and fade-in/fade-out retain their original selection.
-	if(a && ent->m_rwObject && mi->m_alpha == 255 && !mi->m_firstDamaged &&
-	   TheCamera.GetModernLodMultiplier() > 1.0f){
-		RpGeometry *current = RpAtomicGetGeometry((RpAtomic*)ent->m_rwObject);
-		int previous = -1, selected = -1;
-		for(int i = 0; i < mi->m_numAtomics && i < 3; ++i){
-			RpAtomic *candidate = mi->m_atomics[i];
-			if(candidate && RpAtomicGetGeometry(candidate) == current) previous = i;
-			if(candidate == a) selected = i;
-		}
-		if(previous >= 0 && selected >= 0){
-			int lower = Min(previous, selected);
-			if(ModernVisualPolicy::KeepPreviousLod(previous, selected, dist, mi->GetLodDistance(lower)))
-				a = mi->m_atomics[previous];
-		}
-	}
-#endif
 	if(a){
 		mi->m_isDamaged = false;
 		if(ent->m_rwObject == nil)
@@ -1099,16 +1058,6 @@ CRenderer::ScanWorld(void)
 	vectors[CORNER_PRIO_RIGHT].x = vectors[CORNER_LOD_RIGHT].x * 0.2f;
 	vectors[CORNER_PRIO_RIGHT].y = vectors[CORNER_LOD_RIGHT].y * 0.2f;
 	vectors[CORNER_PRIO_RIGHT].z = vectors[CORNER_LOD_RIGHT].z;
-	float priorityScanDistance = LOD_DISTANCE;
-#if defined(MODERN_FEATURES) && defined(FIX_BUGS)
-	// Only the normal scan should reach the extended visual horizon. Keep the
-	// priority wedge at its Classic distance so nearby models get loaded first.
-	float modernLod = TheCamera.GetModernLodMultiplier();
-	float priorityScale = ModernVisualPolicy::PriorityLodDistance(1.0f, modernLod);
-	priorityScanDistance = ModernVisualPolicy::PriorityLodDistance(LOD_DISTANCE, modernLod);
-	vectors[CORNER_PRIO_LEFT] *= priorityScale;
-	vectors[CORNER_PRIO_RIGHT] *= priorityScale;
-#endif
 	RwV3dTransformPoints(vectors, vectors, 9, cammatrix);
 
 	m_loadingPriority = false;
@@ -1152,7 +1101,7 @@ CRenderer::ScanWorld(void)
 		}else
 #endif
 		{
-			if(f > priorityScanDistance){
+			if(f > LOD_DISTANCE){
 				// priority
 				poly[0].x = CWorld::GetSectorX(vectors[CORNER_CAM].x);
 				poly[0].y = CWorld::GetSectorY(vectors[CORNER_CAM].y);
@@ -1161,9 +1110,7 @@ CRenderer::ScanWorld(void)
 				poly[2].x = CWorld::GetSectorX(vectors[CORNER_PRIO_RIGHT].x);
 				poly[2].y = CWorld::GetSectorY(vectors[CORNER_PRIO_RIGHT].y);
 				ScanSectorPoly(poly, 3, ScanSectorList_Priority);
-			}
 
-			if(f > LOD_DISTANCE){
 				// below LOD
 				poly[0].x = CWorld::GetSectorX(vectors[CORNER_CAM].x);
 				poly[0].y = CWorld::GetSectorY(vectors[CORNER_CAM].y);
@@ -1495,20 +1442,13 @@ CRenderer::InsertEntityIntoList(CEntity *ent)
 #endif
 
 #ifdef NEW_RENDERER
-	// Wider view distances can exceed the fixed render lists. Drop excess
-	// entities instead of writing past the array on dense maps.
-	if(gbNewRenderer && (ent->IsVehicle() || ent->IsPed())) {
-		if (ms_nNoOfVisibleVehicles < RENDER_VISIBLE_CAPACITY)
-			ms_aVisibleVehiclePtrs[ms_nNoOfVisibleVehicles++] = ent;
-		return;
-	}
-	if(gbNewRenderer && ent->IsBuilding()) {
-		if (ms_nNoOfVisibleBuildings < RENDER_VISIBLE_CAPACITY)
-			ms_aVisibleBuildingPtrs[ms_nNoOfVisibleBuildings++] = ent;
-		return;
-	}
+	// TODO: there are more flags being checked here
+	if(gbNewRenderer && (ent->IsVehicle() || ent->IsPed()))
+		ms_aVisibleVehiclePtrs[ms_nNoOfVisibleVehicles++] = ent;
+	else if(gbNewRenderer && ent->IsBuilding())
+		ms_aVisibleBuildingPtrs[ms_nNoOfVisibleBuildings++] = ent;
+	else
 #endif
-	if (ms_nNoOfVisibleEntities < RENDER_VISIBLE_CAPACITY)
 		ms_aVisibleEntityPtrs[ms_nNoOfVisibleEntities++] = ent;
 }
 
@@ -1519,12 +1459,14 @@ CRenderer::ScanBigBuildingList(CPtrList &list)
 	CEntity *ent;
 	int vis;
 
+	int f = CTimer::GetFrameCounter() & 3;
 	for(node = list.first; node; node = node->next){
 		ent = (CEntity*)node->item;
-		// Re-evaluate every frame: the previous visibility result can become
-		// stale as a related high-detail model is streamed in or out.
-		ent->bOffscreen = true;
-		vis = SetupBigBuildingVisibility(ent);
+		if(ent->bOffscreen || (ent->m_randomSeed&3) != f){
+			ent->bOffscreen = true;
+			vis = SetupBigBuildingVisibility(ent);
+		}else
+			vis = VIS_VISIBLE;
 		switch(vis){
 		case VIS_VISIBLE:
 			InsertEntityIntoList(ent);

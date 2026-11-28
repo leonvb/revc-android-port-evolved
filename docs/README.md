@@ -27,11 +27,11 @@ This folder contains the architectural design and phased engineering plan for mo
 
 | Document | Scope | Key Engine Subsystems |
 | :--- | :--- | :--- |
-| [00 — Phased Implementation Plan & Release Schedule](00-implementation-phases.md) | Master 7-phase (`Phase 0–6`) rollout schedule, PR milestone breakdown (`M0.1–M6.5`), dependency graph, risk ratings, and CI/playtest acceptance gates | All subsystems (`dev` → `miami` workflow) |
+| [00 — Phased Implementation Plan & Release Schedule](00-implementation-phases.md) | Rollout schedule, milestone breakdown, dependency graph, risk ratings, and CI/playtest acceptance gates; Phase 6 removed | All subsystems (`dev` → `miami` workflow) |
 | [01 — High-FPS Physics & Driving Modernization](01-physics-and-driving.md) | 60/120 FPS frame-rate-independent physics fixes, progressive tire grip/drifting, weight transfer, transmission upgrades, mid-air vehicle control | `Physical.cpp`, `Automobile.cpp`, `Bike.cpp`, `Boat.cpp`, `Transmission.cpp`, `HandlingMgr.cpp` |
 | [02 — Camera, Aiming & Combat Overhaul](02-camera-aiming-and-combat.md) | Over-the-shoulder 3rd-person ADS camera, move-while-aiming/shooting, hybrid target-assist + free-aim, modern vehicle camera, slow-mo weapon & radio wheels | `Cam.cpp`, `Camera.cpp`, `PlayerPed.cpp`, `Weapon.cpp`, `Hud.cpp`, `Pad.cpp` |
 | [03 — Player Movement & Traversal](03-movement-and-traversal.md) | Surface swimming & water recovery, ledge vaulting/mantling, smooth analog locomotion & sprint model, high-speed vehicle bail-out | `PlayerPed.cpp`, `Ped.cpp`, `WaterLevel.cpp`, `AnimBlendAssociation.cpp` |
-| [04 — Rendering, Lighting & World Visuals](04-rendering-and-visuals.md) | Dynamic shadow mapping, neon HDR bloom, wet-road & screen-space reflections, FXAA/SMAA, dynamic point lights, extended draw distance & zero pop-in | `postfx.cpp`, `custompipes*.cpp`, `Shadows.cpp`, `PointLights.cpp`, `Streaming.cpp`, `src/extras/shaders/` |
+| [04 — Rendering and visuals](04-rendering-and-visuals.md) | Modern rendering work removed; existing renderer retained | — |
 | [05 — Navigation, Checkpoints & Quality of Life](05-navigation-and-qol.md) | GTA IV/V-style 3D/minimap GPS route line (`ThePaths` A*), automatic post-mission saves, mid-mission stage checkpoints, faster interior/cutscene fades | `Radar.cpp`, `PathFind.cpp`, `PCSave.cpp`, `GameLogic.cpp`, `Script.cpp` |
 | [06 — Android & Mobile UX Polish](06-android-and-mobile-ux.md) | Context-aware touch HUD transitions, rich `VibrationEffect` haptics via JNI, gyroscope ADS fine-aiming, analog triggers/throttle gestures, thermal/FPS pacing | `TouchControlsView.java`, `GameActivity.java`, `TouchControls.cpp`, `JavaWrapper.cpp`, `sdl2.cpp` |
 
@@ -39,7 +39,7 @@ This folder contains the architectural design and phased engineering plan for mo
 
 ## Recommended Implementation Phases
 
-See **[00 — Phased Implementation Plan & Release Schedule](00-implementation-phases.md)** for the full milestone-by-milestone PR plan (`M0.1` through `M6.5`), dependency graph, risk levels, and acceptance gates:
+See **[00 — Phased Implementation Plan & Release Schedule](00-implementation-phases.md)** for milestones, dependencies, risk levels, and acceptance gates. Phase 6 was removed:
 
 1. **Phase 0 — Foundation**: `config.h` + `reVC.ini` `[Modern]` settings, Pause Menu **"Modernization"** page, `CTimer` exponential time-step helpers, and Android `30 / 60 / 90 / 120 FPS` LTPO display pacing (`M0.1–M0.2`).
 2. **Phase 1 — High-FPS Physics & Driving**: 60/120 FPS physics & boat drag parity fixes, Pacejka-lite progressive tire slip/drifting & weight transfer, and modern transmission + mid-air jump control (`M1.1–M1.3`, [Doc 01](01-physics-and-driving.md)).
@@ -47,4 +47,4 @@ See **[00 — Phased Implementation Plan & Release Schedule](00-implementation-p
 4. **Phase 3 — Camera, Combat & Radial Wheels**: Modern vehicle camera, Over-the-Shoulder 3rd-person ADS + strafe-while-shooting, hybrid snap + free micro-aim assist, and slow-motion Weapon & Radio Wheels (`M3.1–M3.4`, [Doc 02](02-camera-aiming-and-combat.md)).
 5. **Phase 4 — Android & Mobile UX Polish**: Linear X-axis `VibrationEffect` haptics, orientation-aware gyroscope ADS aiming, sub-context touch HUD transitions, analog throttle/brake slide, and 1-tap HUD shortcuts (`M4.1–M4.3`, [Doc 06](06-android-and-mobile-ux.md)).
 6. **Phase 5 — Traversal Expansion**: Hold-to-sprint & smooth analog locomotion, surface swimming + shore/dock/boat climb-out, and two-ray physical ledge vaulting/mantling (`M5.1–M5.3`, [Doc 03](03-movement-and-traversal.md)).
-7. **Phase 6 — Modern Rendering & Shader Pipeline**: Extended draw distance & streaming budgets, Dual-Kawase HDR neon bloom + FXAA 3.11, per-pixel dynamic point lights, weather-driven wet-road reflections (`CWeather::WetRoads`), and directional sun/moon shadow mapping (`M6.1–M6.5`, [Doc 04](04-rendering-and-visuals.md)).
+7. **Phase 6 — Modern rendering**: Removed; see [Doc 04](04-rendering-and-visuals.md).

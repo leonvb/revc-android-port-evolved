@@ -74,13 +74,9 @@ void CustomPipeRegister(void);
 void CustomPipeRegisterGL(void);
 void CustomPipeInit(void);
 void CustomPipeShutdown(void);
-#if defined(MODERN_FEATURES) && defined(RW_GL3)
-void RenderDirectionalShadowMap(void);
-#endif
 void SetTxdFindCallback(void);
 
 extern bool bRenderingEnvMap;
-extern bool EnvMapHasFrame;
 extern int32 EnvMapSize;
 extern rw::Camera *EnvMapCam;
 extern rw::Texture *EnvMapTex;
@@ -142,7 +138,7 @@ void AttachRimPipe(rw::Clump *clump);
 
 namespace WorldRender{
 extern int numBlendInsts[3];
-void AtomicFirstPass(RpAtomic *atomic, int pass, bool road);
+void AtomicFirstPass(RpAtomic *atomic, int pass);
 void AtomicFullyTransparent(RpAtomic *atomic, int pass, int fadeAlpha);
 void RenderBlendPass(int pass);
 }
