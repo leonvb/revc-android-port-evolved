@@ -54,6 +54,7 @@ int8 CModernConfig::m_bFastInteriorFades = 0;
 
 int8 CModernConfig::m_bModernVehicleCam = 0;
 int8 CModernConfig::m_nAimMode = MODERN_AIM_CLASSIC;
+int8 CModernConfig::m_nAimMagnetism = MODERN_MAGNETISM_OFF;
 int8 CModernConfig::m_bRightShoulder = 1;
 int8 CModernConfig::m_bWeaponRadioWheels = 0;
 float CModernConfig::m_fVehCamAutoCenterDelay = 1.75f;
@@ -85,6 +86,7 @@ CModernConfig::ResetToClassicDefaults()
 
 	m_bModernVehicleCam = 0;
 	m_nAimMode = MODERN_AIM_CLASSIC;
+	m_nAimMagnetism = MODERN_MAGNETISM_OFF;
 	m_bRightShoulder = 1;
 	m_bWeaponRadioWheels = 0;
 	m_fVehCamAutoCenterDelay = 1.75f;
@@ -129,6 +131,7 @@ CModernConfig::ApplyPreset(int8 preset)
 #else
 		m_nAimMode = MODERN_AIM_FREE;
 #endif
+		m_nAimMagnetism = MODERN_MAGNETISM_MEDIUM;
 		m_bRightShoulder = 1;
 		m_bWeaponRadioWheels = 1;
 		m_fVehCamAutoCenterDelay = 1.75f;
@@ -178,6 +181,8 @@ CModernConfig::ClampValues()
 	m_bModernVehicleCam = m_bModernVehicleCam ? 1 : 0;
 	if (m_nAimMode < MODERN_AIM_CLASSIC || m_nAimMode > MODERN_AIM_ASSISTED)
 		m_nAimMode = MODERN_AIM_CLASSIC;
+	if (m_nAimMagnetism < MODERN_MAGNETISM_OFF || m_nAimMagnetism > MODERN_MAGNETISM_HIGH)
+		m_nAimMagnetism = MODERN_MAGNETISM_OFF;
 	m_bRightShoulder = m_bRightShoulder ? 1 : 0;
 	m_bWeaponRadioWheels = m_bWeaponRadioWheels ? 1 : 0;
 	if (m_fVehCamAutoCenterDelay < 0.25f) m_fVehCamAutoCenterDelay = 0.25f;

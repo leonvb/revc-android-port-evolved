@@ -40,6 +40,14 @@ enum eModernAimMode
 	MODERN_AIM_ASSISTED = 2,
 };
 
+enum eModernAimMagnetism
+{
+	MODERN_MAGNETISM_OFF = 0,
+	MODERN_MAGNETISM_LOW,
+	MODERN_MAGNETISM_MEDIUM,
+	MODERN_MAGNETISM_HIGH,
+};
+
 enum eModernHapticsMode
 {
 	MODERN_HAPTICS_OFF = 0,
@@ -77,6 +85,7 @@ public:
 	// Phase 3: Camera, OTS Aiming & Radial Wheels
 	static int8 m_bModernVehicleCam;   // 0/1
 	static int8 m_nAimMode;            // eModernAimMode
+	static int8 m_nAimMagnetism;       // eModernAimMagnetism
 	static int8 m_bRightShoulder;      // 1 = right shoulder, 0 = left shoulder
 	static int8 m_bWeaponRadioWheels;  // 0/1
 	static float m_fVehCamAutoCenterDelay; // seconds (default: 1.75f)

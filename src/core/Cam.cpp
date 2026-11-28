@@ -29,6 +29,8 @@
 #ifdef MODERN_FEATURES
 #include "ModernConfig.h"
 #include "ModernVehicleCamera.h"
+#include "ModernAimMagnetism.h"
+#include "ModernWheels.h"
 #include "Replay.h"
 #include "Record.h"
 #include "CutsceneMgr.h"
@@ -84,44 +86,95 @@ ModernAimBlendOutAllowed(CCam *cam)
 		TheCamera.WhoIsInControlOfTheCamera == CAMCONTROL_GAME && !TheCamera.m_WideScreenOn &&
 		!CCutsceneMgr::IsCutsceneProcessing() && !CReplay::IsPlayingBack();
 }
-// Return a visible, actively hostile ped near the reticle. No entity pointer is
-// retained: the caller stores angles only, so despawns cannot leave stale refs.
+// Android's virtual controls share the joystick state with real SDL pads.
+// Distinguish them only for tuning; mouse/keyboard never receive magnetism.
+#if defined(ANDROID) && defined(LIBRW_SDL2)
+extern bool AndroidPhysicalControllerConnected();
+#endif
+
 static bool
-FindModernAimThreat(const CVector &origin, const CVector &forward, float coneDot, CVector &point, int side = 0)
+ModernMagnetismMuzzle(CPlayerPed *player, CWeaponInfo *info, CVector &muzzle, CVector &chest)
 {
-	CPlayerPed *player = FindPlayerPed();
+	if (!player || !player->GetClump() || !player->m_pFrames[PED_HANDR]) return false;
+	RpHAnimHierarchy *hier = GetAnimHierarchyFromSkinClump(player->GetClump());
+	if (!hier || !RpHAnimHierarchyGetMatrixArray(hier) ||
+	    RpHAnimIDGetIndex(hier, player->m_pFrames[PED_HANDR]->nodeID) < 0) return false;
+	muzzle = info->m_vecFireOffset;
+	player->TransformToNode(muzzle, PED_HANDR); // same origin as on-foot firing
+	if (player->GetWeapon()->m_bAddRotOffset) {
+		float heading = player->GetForward().Heading();
+		muzzle.x -= Sin(heading) * 0.15f;
+		muzzle.y += Cos(heading) * 0.15f;
+	}
+	chest = player->GetPosition();
+	chest.z += player->bIsDucking ? 0.35f : 0.7f;
+	return true;
+}
+
+static bool
+ModernMagnetismLineClear(const CVector &from, const CVector &to, CPlayerPed *player, CPed *target)
+{
+	if ((to - from).MagnitudeSqr() < 0.0001f) return true;
+	CEntity *oldIgnore = CWorld::pIgnoreEntity;
+	CWorld::pIgnoreEntity = player;
+	CColPoint hit;
+	CEntity *entity = nil;
+	bool blocked = CWorld::ProcessLineOfSight(from, to, hit, entity,
+		true, true, true, true, true, false, false, true);
+	CWorld::pIgnoreEntity = oldIgnore;
+	return !blocked || (target && entity == target);
+}
+
+static bool
+ModernMagnetismCandidate(CPed *ped, CPlayerPed *player, const CVector &origin,
+                         const CVector &forward, const CVector &muzzle,
+                         float range, float coneDot, CVector &point, float &dot)
+{
+	if (!ped || ped == player || ped->DyingOrDead() || ped->bInVehicle || ped->bNeverEverTargetThisPed)
+		return false;
+	bool hostile = ped->m_pPointGunAt == player ||
+		(ped->m_nPedState == PED_ATTACK && ped->m_pSeekTarget == player) ||
+		((ped->m_objective == OBJECTIVE_KILL_CHAR_ON_FOOT || ped->m_objective == OBJECTIVE_KILL_CHAR_ANY_MEANS) && ped->m_pedInObjective == player);
+	if (!ModernAimMagnetism::IsEligibleRelationship(ped->CharCreatedBy == MISSION_CHAR,
+		ped->bIsPlayerFriend, ped->m_leader == player, hostile)) return false;
+
+	// Nearest height on the body to the current reticle, rather than dragging
+	// a deliberate headshot down to a fixed centre point.
+	point = ped->GetPosition();
+	float horizontal = forward.x * forward.x + forward.y * forward.y;
+	float t = horizontal > 0.0001f ? ((point.x - origin.x) * forward.x + (point.y - origin.y) * forward.y) / horizontal : 0.0f;
+	point.z = ModernAimMagnetism::BodyHeight(origin.z + Max(t, 0.0f) * forward.z,
+		ped->GetPosition().z, ped->bIsDucking);
+	CVector delta = point - origin;
+	float distance = delta.Magnitude();
+	if (distance < 0.5f) return false;
+	delta *= 1.0f / distance;
+	dot = DotProduct(delta, forward);
+	return ModernAimMagnetism::InConeAndRange(dot, coneDot, (point - muzzle).MagnitudeSqr(), range);
+}
+
+// A single scan, only when acquiring. Retained targets are checked directly by
+// generation-checked pool handle; no raw ped pointer survives the frame.
+static int32
+FindModernAimThreat(CPlayerPed *player, const CVector &origin, const CVector &forward,
+                    const CVector &muzzle, float range, CVector &point, float &bestDot)
+{
 	CPedPool *pool = CPools::GetPedPool();
-	if (!player || !pool) return false;
-	float range = CWeaponInfo::GetWeaponInfo(player->GetWeapon()->m_eWeaponType)->m_fRange;
-	float bestDot = coneDot;
-	bool found = false;
+	if (!pool) return -1;
+	int32 best = -1;
+	bestDot = ModernAimMagnetism::ACQUIRE_CONE_DOT;
 	for (int i = 0; i < pool->GetSize(); ++i) {
 		CPed *ped = pool->GetSlot(i);
-		if (!ped || ped == player || ped->DyingOrDead() || ped->bInVehicle ||
-		    ped->bNeverEverTargetThisPed || ped->m_leader == player)
-			continue;
-		bool hostile = ped->m_pPointGunAt == player ||
-			((ped->m_objective == OBJECTIVE_KILL_CHAR_ON_FOOT || ped->m_objective == OBJECTIVE_KILL_CHAR_ANY_MEANS) && ped->m_pedInObjective == player);
-		if (!hostile) continue;
-		CVector candidate = ped->GetPosition();
-		candidate.z += 0.45f;
-		CVector delta = candidate - origin;
-		float distance = delta.Magnitude();
-		if (distance < 0.5f || distance > range) continue;
-		delta *= 1.0f / distance;
-		float dot = DotProduct(delta, forward);
-		// Camera right is (forward.y, -forward.x). A side request ignores
-		// targets directly under the reticle and searches only that side.
-		float lateral = delta.x * forward.y - delta.y * forward.x;
-		if (dot <= bestDot || (side && lateral * side < 0.05234f)) continue;
-		CEntity *oldIgnore = CWorld::pIgnoreEntity;
-		CWorld::pIgnoreEntity = player;
-		bool visible = CWorld::GetIsLineOfSightClear(origin, candidate, true, true, false, true, false, false, false);
-		CWorld::pIgnoreEntity = oldIgnore;
-		if (visible) { bestDot = dot; point = candidate; found = true; }
+		CVector candidate;
+		float dot;
+		if (!ModernMagnetismCandidate(ped, player, origin, forward, muzzle, range, bestDot, candidate, dot)) continue;
+		if (!ModernMagnetismLineClear(origin, candidate, player, ped) ||
+		    !ModernMagnetismLineClear(muzzle, candidate, player, ped)) continue;
+		bestDot = dot; point = candidate; best = CPools::GetPedRef(ped);
 	}
-	return found;
+	return best;
 }
+
 #endif
 
 void
@@ -1447,18 +1500,24 @@ CCam::Process_FollowPedWithMouse(const CVector &CameraTarget, float TargetOrient
 		return;
 
 #ifdef MODERN_FEATURES
-	static float snapTime[3] = { 0.0f, 0.0f, 0.0f };
-	static float snapBeta[3], snapAlpha[3];
-	static int flickSide[3] = { 0, 0, 0 };
+	static ModernAimMagnetism::State magnetism[3];
+	static int32 aimOwner[3] = { -1, -1, -1 };
+	static int32 aimWeapon[3] = { -1, -1, -1 };
 	const int aimCamIndex = this - TheCamera.Cams;
 	float &aimAmount = modernAimBlend[aimCamIndex];
-	if (ResetStatics || modernAimLastFrame[aimCamIndex] + 1 != CTimer::GetFrameCounter()) {
-		aimAmount = 0.0f;
-		snapTime[aimCamIndex] = 0.0f;
-		flickSide[aimCamIndex] = 0;
-	}
+	ModernAimMagnetism::State &magnet = magnetism[aimCamIndex];
+	bool aimDiscontinuity = ResetStatics || modernAimLastFrame[aimCamIndex] + 1 != CTimer::GetFrameCounter();
+	CPlayerPed *aimPlayer = FindPlayerPed();
+	bool aiming = CamTargetEntity == aimPlayer && CModernConfig::IsModernAimActive();
+	CPedPool *aimPool = aiming ? CPools::GetPedPool() : nil;
+	int32 owner = aimPool && aimPlayer ? CPools::GetPedRef(aimPlayer) : -1;
+	int32 weapon = aiming ? (int32)aimPlayer->GetWeapon()->m_eWeaponType : -1;
+	if (aimDiscontinuity) aimAmount = 0.0f;
+	if (aimDiscontinuity || owner != aimOwner[aimCamIndex] || weapon != aimWeapon[aimCamIndex])
+		magnet.Reset();
+	aimOwner[aimCamIndex] = owner;
+	aimWeapon[aimCamIndex] = weapon;
 	modernAimLastFrame[aimCamIndex] = CTimer::GetFrameCounter();
-	bool aiming = CamTargetEntity == FindPlayerPed() && CModernConfig::IsModernAimActive();
 	float aimStep = Min(CTimer::GetTimeStepInSeconds() / 0.14f, 1.0f);
 	aimAmount = Clamp(aimAmount + (aiming ? aimStep : -aimStep), 0.0f, 1.0f);
 	FOV = DefaultFOV + (52.0f - DefaultFOV) * aimAmount;
@@ -1483,7 +1542,8 @@ CCam::Process_FollowPedWithMouse(const CVector &CameraTarget, float TargetOrient
 
 	float AlphaOffset, BetaOffset;
 #ifdef MODERN_FEATURES
-	bool manualAimInput = false;
+	// The disabled-control branch must also discard any retained target.
+	if (!aiming || CPad::GetPad(0)->ArePlayerControlsDisabled()) magnet.Reset();
 #endif
 	if(CPad::GetPad(0)->IsPlayerControlsDisabledBy(PLAYERCONTROL_PLAYERINFO)){
 		CVector ToCam = Source - TargetCoors;
@@ -1509,13 +1569,60 @@ CCam::Process_FollowPedWithMouse(const CVector &CameraTarget, float TargetOrient
 			LookUpDown = CPad::GetPad(0)->LookAroundUpDown();
 		}
 #ifdef MODERN_FEATURES
-		manualAimInput = LookLeftRight != 0.0f || LookUpDown != 0.0f;
-		if (aiming && !UseMouse && manualAimInput) {
-			CVector fwd(-Cos(Alpha)*Cos(Beta), -Cos(Alpha)*Sin(Beta), Sin(Alpha));
-			CVector threat;
-			if (FindModernAimThreat(Source, fwd, 0.9986295f, threat)) {
-				LookLeftRight *= 0.65f;
-				LookUpDown *= 0.65f;
+		CPad *aimPad = CPad::GetPad(0);
+		bool controllerInput = false;
+#ifdef DETECT_PAD_INPUT_SWITCH
+		controllerInput = CPad::IsAffectedByController && !UseMouse;
+#endif
+		bool touch = false;
+#if defined(ANDROID) && defined(LIBRW_SDL2)
+		touch = aiming && !AndroidPhysicalControllerConnected();
+#endif
+		ModernAimMagnetism::Tuning tuning = ModernAimMagnetism::ForAimMode(
+			ModernAimMagnetism::GetTuning(CModernConfig::m_nAimMagnetism, touch),
+			CModernConfig::m_nAimMode == MODERN_AIM_ASSISTED);
+		float inputAmount = ModernAimMagnetism::InputAmount(aimPad->GetRightStickX(), aimPad->GetRightStickY(),
+			ControlsManager.m_rStickSensX, ControlsManager.m_rStickSensY);
+		float dt = CTimer::GetTimeStepInSeconds();
+		bool eligible = aiming && !aimDiscontinuity && this == &TheCamera.Cams[TheCamera.ActiveCam] &&
+			controllerInput && CModernConfig::m_nAimMagnetism != MODERN_MAGNETISM_OFF &&
+			weapon >= WEAPONTYPE_COLT45 && weapon <= WEAPONTYPE_RUGER && aimPool &&
+			!aimPlayer->m_pPointGunAt && !FrontEndMenuManager.GetIsMenuActive() &&
+			!CModernWheels::IsOpen() && !OnTrain && !TheCamera.Using1stPersonWeaponMode() && !TheCamera.m_bUseTransitionBeta &&
+			!TheCamera.m_bCamDirectlyBehind && !TheCamera.m_bCamDirectlyInFront && CDraw::FadeValue <= 100;
+		CVector magnetPoint;
+		float magnetWeight = 0.0f;
+		if (magnet.BeginFrame(eligible, inputAmount >= tuning.breakInput, dt)) {
+			CWeaponInfo *info = CWeaponInfo::GetWeaponInfo((eWeaponType)weapon);
+			CVector muzzle, chest;
+			if (!info || info->m_eWeaponFire != WEAPON_FIRE_INSTANT_HIT || info->m_fRange <= 0.0f ||
+			    !ModernMagnetismMuzzle(aimPlayer, info, muzzle, chest)) {
+				magnet.Reset();
+			} else {
+				CVector fwd(-Cos(Alpha)*Cos(Beta), -Cos(Alpha)*Sin(Beta), Sin(Alpha));
+				bool muzzleClear = ModernMagnetismLineClear(chest, muzzle, aimPlayer, nil);
+				float dot = 0.0f;
+				bool visible = false;
+				if (magnet.target != -1) {
+					int index = magnet.target >> 8;
+					CPed *ped = index >= 0 && index < aimPool->GetSize() ? aimPool->GetAt(magnet.target) : nil;
+					bool valid = ModernMagnetismCandidate(ped, aimPlayer, Source, fwd, muzzle,
+						info->m_fRange, ModernAimMagnetism::RETAIN_CONE_DOT, magnetPoint, dot);
+					bool clear = valid && muzzleClear && ModernMagnetismLineClear(Source, magnetPoint, aimPlayer, ped) &&
+						ModernMagnetismLineClear(muzzle, magnetPoint, aimPlayer, ped);
+					visible = magnet.Visible(valid, clear, dt);
+				} else if (magnet.CanAcquire() && muzzleClear) {
+					magnet.Scanned(); // bound empty-scene pool scans
+					int32 target = FindModernAimThreat(aimPlayer, Source, fwd, muzzle, info->m_fRange, magnetPoint, dot);
+					if (target != -1) { magnet.Acquire(target); visible = true; }
+				}
+				if (visible) {
+					float manualScale = ModernAimMagnetism::ManualScale(inputAmount, tuning);
+					magnetWeight = ModernAimMagnetism::ConeWeight(dot) * manualScale;
+					float friction = 1.0f - tuning.friction * magnetWeight;
+					LookLeftRight *= friction;
+					LookUpDown *= friction;
+				}
 			}
 		}
 #endif
@@ -1526,6 +1633,16 @@ CCam::Process_FollowPedWithMouse(const CVector &CameraTarget, float TargetOrient
 			BetaOffset = LookLeftRight * fStickSens * (1.0f/14.0f) * FOV/80.0f * CTimer::GetTimeStep();
 			AlphaOffset = LookUpDown * fStickSens * (0.6f/14.0f) * FOV/80.0f * CTimer::GetTimeStep();
 		}
+#ifdef MODERN_FEATURES
+		if (magnetWeight > 0.0f) {
+			CVector direction = magnetPoint - Source;
+			direction.Normalise();
+			float targetBeta = Atan2(-direction.y, -direction.x);
+			float targetAlpha = Asin(Clamp(direction.z, -1.0f, 1.0f));
+			BetaOffset += ModernAimMagnetism::Attraction(ModernAimMagnetism::ShortestAngle(targetBeta - Beta - BetaOffset), dt, magnetWeight, tuning);
+			AlphaOffset += ModernAimMagnetism::Attraction(targetAlpha - Alpha - AlphaOffset, dt, magnetWeight, tuning);
+		}
+#endif
 	}
 
 	if(TheCamera.GetFading() && TheCamera.GetFadingDirection() == FADE_IN && nFadeControlThreshhold < CDraw::FadeValue ||
@@ -1543,48 +1660,6 @@ CCam::Process_FollowPedWithMouse(const CVector &CameraTarget, float TargetOrient
 			AlphaOffset = 0.0f;
 	}
 
-#ifdef MODERN_FEATURES
-	if (aiming && CModernConfig::m_nAimMode == MODERN_AIM_ASSISTED && CPad::GetPad(0)->TargetJustDown() && !manualAimInput) {
-		CVector fwd(-Cos(Alpha)*Cos(Beta), -Cos(Alpha)*Sin(Beta), Sin(Alpha));
-		CVector threat;
-		if (FindModernAimThreat(Source, fwd, 0.9781476f, threat)) {
-			CVector dir = threat - Source;
-			dir.Normalise();
-			snapBeta[aimCamIndex] = Atan2(-dir.y, -dir.x);
-			snapAlpha[aimCamIndex] = Asin(Clamp(dir.z, -1.0f, 1.0f));
-			snapTime[aimCamIndex] = 0.1f;
-		}
-	}
-	if (!aiming || manualAimInput)
-		snapTime[aimCamIndex] = 0.0f;
-	if (!aiming || CModernConfig::m_nAimMode != MODERN_AIM_ASSISTED) {
-		flickSide[aimCamIndex] = 0;
-	} else {
-		int stickX = CPad::GetPad(0)->GetRightStickX();
-		if (Abs(stickX) > 110 && !flickSide[aimCamIndex])
-			flickSide[aimCamIndex] = stickX > 0 ? 1 : -1;
-		if (Abs(stickX) < 20 && flickSide[aimCamIndex] && !manualAimInput) {
-			CVector fwd(-Cos(Alpha)*Cos(Beta), -Cos(Alpha)*Sin(Beta), Sin(Alpha));
-			CVector threat;
-			if (FindModernAimThreat(Source, fwd, 0.8191520f, threat, flickSide[aimCamIndex])) {
-				CVector dir = threat - Source;
-				dir.Normalise();
-				snapBeta[aimCamIndex] = Atan2(-dir.y, -dir.x);
-				snapAlpha[aimCamIndex] = Asin(Clamp(dir.z, -1.0f, 1.0f));
-				snapTime[aimCamIndex] = 0.1f;
-			}
-			flickSide[aimCamIndex] = 0;
-		}
-	}
-	if (snapTime[aimCamIndex] > 0.0f) {
-		float dt = Min(CTimer::GetTimeStepInSeconds(), snapTime[aimCamIndex]);
-		float portion = dt / snapTime[aimCamIndex];
-		float deltaBeta = CGeneral::LimitRadianAngle(snapBeta[aimCamIndex] - Beta);
-		BetaOffset += deltaBeta * portion;
-		AlphaOffset += (snapAlpha[aimCamIndex] - Alpha) * portion;
-		snapTime[aimCamIndex] -= dt;
-	}
-#endif
 	Alpha += AlphaOffset;
 	Beta += BetaOffset;
 	while(Beta >= PI) Beta -= 2*PI;
@@ -5031,15 +5106,21 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 #ifdef MODERN_FEATURES
 	// Only normal player-controlled road vehicles; never alter scripted, remote,
 	// aircraft, boat, tank or firetruck camera controls.
-	bool modernVehicleCamera = UseModernVehicleFollowCam(car);
+	bool modernVehicleCamera = Mode == MODE_CAM_ON_A_STRING && UseModernVehicleFollowCam(car);
 	static ModernVehicleCameraState modernState[3];
 	static const CVehicle *lastVehicle[3] = { nil, nil, nil };
 	static uint32 lastFrame[3] = { 0, 0, 0 };
+	static CVector lastModernSource[3];
+	static bool lastModernSourceValid[3] = { false, false, false };
+	static bool modernSweepBlocked[3] = { false, false, false };
 	const int camIndex = this - TheCamera.Cams;
 	ModernVehicleCameraState &state = modernState[camIndex];
 	if (!modernVehicleCamera || ResetStatics || lastVehicle[camIndex] != car ||
-	    lastFrame[camIndex] + 1 != CTimer::GetFrameCounter())
+	    lastFrame[camIndex] + 1 != CTimer::GetFrameCounter()) {
 		state.Reset(DefaultFOV);
+		lastModernSourceValid[camIndex] = false;
+		modernSweepBlocked[camIndex] = false;
+	}
 	lastVehicle[camIndex] = modernVehicleCamera ? car : nil;
 	lastFrame[camIndex] = CTimer::GetFrameCounter();
 #endif
@@ -5174,6 +5255,18 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 		if (DirectionWasLooking != LOOKING_FORWARD)
 			TheCamera.m_bCamDirectlyBehind = true;
 
+#ifdef MODERN_FEATURES
+	// Explicit look directions and camera resets retain the original behavior.
+	// Do not start an automatic transition on the same frame as a forced view.
+	bool yawAllowed = modernVehicleCamera && this == &TheCamera.Cams[TheCamera.ActiveCam] &&
+		nextDirectionIsForward && !ResetStatics &&
+		!TheCamera.m_bCamDirectlyBehind && !TheCamera.m_bCamDirectlyInFront &&
+		!TheCamera.m_bJustCameOutOfGarage && !pad->ArePlayerControlsDisabled() && !CTimer::GetIsPaused();
+	if (!yawAllowed) {
+		lastModernSourceValid[camIndex] = false;
+		modernSweepBlocked[camIndex] = false;
+	}
+#endif
 	// Called when we just entered the car, just started to look behind or returned back from looking left, right or behind
 	if (ResetStatics || TheCamera.m_bCamDirectlyBehind || TheCamera.m_bCamDirectlyInFront) {
 		ResetStatics = false;
@@ -5361,9 +5454,17 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 			AlphaSpeed = 0.0;
 			xMovement = mouseX * FOV / 80.0f * TheCamera.m_fMouseAccelHorzntl;
 			targetAlpha = Alpha;
+#ifdef MODERN_FEATURES
+			stepsLeftToChangeBetaByMouse = modernVehicleCamera ? 0.0f : 1.0f * 50.0f;
+#else
 			stepsLeftToChangeBetaByMouse = 1.0f * 50.0f;
+#endif
 			mouseChangesBeta = true;
-		} else if (stepsLeftToChangeBetaByMouse > 0.0f) {
+		} else if (stepsLeftToChangeBetaByMouse > 0.0f
+#ifdef MODERN_FEATURES
+		           && !modernVehicleCamera
+#endif
+		           ) {
 			// Finish rotation by decreasing speed when we stopped moving mouse
 			BetaSpeed = 0.0;
 			AlphaSpeed = 0.0;
@@ -5377,8 +5478,11 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 #endif
 
 #ifdef MODERN_FEATURES
+	bool modernYawActive = false;
+	bool manualInput = false;
+	float modernYaw = Beta;
 	if (modernVehicleCamera) {
-		bool manualInput = nextDirectionIsForward && !pad->ArePlayerControlsDisabled() &&
+		manualInput = nextDirectionIsForward && !pad->ArePlayerControlsDisabled() &&
 			(Abs(stickX) > 10.0f || Abs(stickY) > 10.0f);
 #ifdef GTA_PC_CONTROLS
 		manualInput = manualInput || (nextDirectionIsForward && !pad->ArePlayerControlsDisabled() &&
@@ -5391,11 +5495,9 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 			car->pHandling ? car->pHandling->Transmission.fMaxVelocity : 0.0f, DefaultFOV,
 			car->GetForward().z);
 		FOV = state.fov;
-		if (nextDirectionIsForward && !state.HoldingManualOrbit() && state.reverseWiden > 0.01f) {
-			float reverseHeading = car->GetForward().Heading() - HALFPI + PI;
-			float difference = CGeneral::LimitRadianAngle(reverseHeading - Beta);
-			targetBeta = Beta + difference * state.reverseWiden;
-		}
+		modernYawActive = state.UpdateYaw(CTimer::GetTimeStepInSeconds(),
+			DotProduct(car->GetForward(), car->m_vecMoveSpeed),
+			car->GetForward().Heading() - HALFPI, Beta, yawAllowed && !manualInput, modernYaw);
 		if (state.HoldingManualOrbit()) {
 			targetBeta = Beta;
 			targetAlpha = Alpha;
@@ -5436,6 +5538,22 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 	else
 		betaChangePerFrame = CTimer::GetTimeStep() * BetaSpeed;
 	Beta = betaChangePerFrame + Beta;
+#if defined(MODERN_FEATURES) && defined(MODERN_VEHICLE_CAMERA_TRACE)
+	float legacyCandidateYaw = Beta;
+#endif
+#ifdef MODERN_FEATURES
+	if (modernYawActive) {
+		Beta = modernYaw;
+		BetaSpeed = 0.0f; // do not carry the legacy follower's angular momentum
+	}
+#ifdef MODERN_VEHICLE_CAMERA_TRACE
+	if (modernVehicleCamera)
+		debug("modern vehicle yaw frame=%u dt=%.4f speed=%.4f phase=%d yaw=%.4f legacyCandidate=%.4f heading=%.4f yawRate=%.4f active=%d manual=%.3f\n",
+			CTimer::GetFrameCounter(), CTimer::GetTimeStepInSeconds(), DotProduct(car->GetForward(), car->m_vecMoveSpeed),
+			(int)state.yawPhase, Beta, legacyCandidateYaw, car->GetForward().Heading() - HALFPI,
+			state.yawVelocity, modernYawActive, state.manualHold);
+#endif
+#endif
 
 	if (TheCamera.m_bJustCameOutOfGarage) {
 		float invHeading = Atan2(Front.y, Front.x);
@@ -5552,6 +5670,27 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 		CColPoint colPoint;
 		CEntity* entity;
 		CWorld::pIgnoreEntity = CamTargetEntity;
+#ifdef MODERN_FEATURES
+		// The normal target-to-camera ray clips the final position, but a
+		// fast orbit can cross a thin wall between two clear endpoints. Sweep
+		// the visible source as well while the automatic yaw owns the camera.
+		if (modernVehicleCamera && yawAllowed && !manualInput && !state.HoldingManualOrbit() &&
+		    (modernYawActive || modernSweepBlocked[camIndex]) && lastModernSourceValid[camIndex]) {
+			float sweepDistanceSq = (Source - lastModernSource[camIndex]).MagnitudeSqr();
+			if (sweepDistanceSq > 0.000001f && sweepDistanceSq < sq(20.0f)) {
+				CColPoint sweepPoint;
+				CEntity *sweepEntity = nil;
+				modernSweepBlocked[camIndex] = CWorld::ProcessLineOfSight(lastModernSource[camIndex], Source,
+					sweepPoint, sweepEntity, true, false, false, true, false, true, true) &&
+					!IS_TRAFFIC_LIGHT(sweepEntity);
+				if (modernSweepBlocked[camIndex]) Source = sweepPoint.point;
+			} else if (sweepDistanceSq >= sq(20.0f)) {
+				modernSweepBlocked[camIndex] = false; // teleport, not an orbit
+			}
+		} else {
+			modernSweepBlocked[camIndex] = false;
+		}
+#endif
 		if(CWorld::ProcessLineOfSight(TargetCoors, Source, colPoint, entity, true, dontCollideWithCars < 0.1f, false, true, false, true, true) && !IS_TRAFFIC_LIGHT(entity)){
 			float PedColDist = (TargetCoors - colPoint.point).Magnitude();
 			float ColCamDist = newDistance - PedColDist;
@@ -5573,6 +5712,15 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 		}
 		
 		CWorld::pIgnoreEntity = nil;
+#ifdef MODERN_FEATURES
+		// The sweep can move Source off the target ray; use the resulting
+		// direction for the near-plane test as well as the rendered view.
+		if (modernVehicleCamera) {
+			Front = TargetCoors - Source;
+			Front.z += (TargetCoors - Source).Magnitude2D() * Tan(state.pitch);
+			Front.Normalise();
+		}
+#endif
 
 		// If we're seeing blue hell due to camera intersects some surface, fix it.
 		// SA and LCS have this unrolled.
@@ -5631,6 +5779,10 @@ CCam::Process_FollowCar_SA(const CVector& CameraTarget, float TargetOrientation,
 	}
 	Front = TargetCoors - Source;
 #ifdef MODERN_FEATURES
+	if (yawAllowed) {
+		lastModernSource[camIndex] = Source;
+		lastModernSourceValid[camIndex] = true;
+	}
 	if (modernVehicleCamera && nextDirectionIsForward)
 		Front.z += (TargetCoors - Source).Magnitude2D() * Tan(state.pitch);
 #endif

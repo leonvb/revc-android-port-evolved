@@ -54,12 +54,58 @@ Complete an **action-by-context matrix** before code is frozen: include phone, c
 
 ## M2 — Reverse camera transition and return
 
+**Implementation status:** reverse and forward-return yaw now use separate
+bounded, substepped transitions for eligible Modern car/bike follow cameras.
+Manual orbit and explicit look directions interrupt/reset automatic yaw; a
+camera-source sweep supplements the existing target-to-camera collision checks.
+The old reverse FOV widening remains independent. In the previous code it also
+scaled `targetBeta`, while the legacy follower filtered and rate-limited that
+moving target; it provided no separate forward-return target. Explicit view
+reset flags also directly set `Beta`. The new controller replaces the first
+path only and leaves explicit view resets intact. Compile with
+`MODERN_VEHICLE_CAMERA_TRACE` for trajectory logs. Host tests are not a
+substitute for collision and gameplay testing; entry/return tuning and actual
+before/after traces remain unverified on device. M1 remains incomplete.
+
 - Instrument current `src/core/ModernVehicleCamera.h` and `src/core/Cam.cpp` separately: measure yaw trajectory, angular velocity, reverse-entry/exit delay, interactions with `nextDirectionIsForward`, camera collision and the existing manual orbit hold. Find the actual snapping source before changing coefficients; current reverse widening is not itself a complete yaw controller.
 - Introduce an explicit per-camera/player/vehicle transition state with separate reverse-entry and forward-return targets. Use shortest-angle interpolation with a bounded angular velocity/acceleration and time-step-independent smoothing; use speed hysteresis so braking, gear flicker and slopes do not oscillate. Tune initial targets as **playtest hypotheses**, e.g. smooth visible entry in about 0.5–0.8 s, then resume following forward in about 0.35–0.6 s after confirmed forward movement. Do not enforce an abrupt camera teleport to meet a timer.
 - Manual right-stick/touch orbit remains authoritative. Its normal hold delay applies to user orbit, not an extra delay introduced solely by the reverse-to-forward transition. Reset on camera/vehicle change, cutscene, replay, first-person, look-behind and disabled Modern camera. Retain camera collision and avoid swings through walls.
 - Add unit trajectory tests at 30/60/120 FPS, ±π wrap, neutral/oscillation, repeated direction changes, long frames, manual interruption and resets. On device test reversing out of parking spaces, tapping brakes while moving forward, immediate forward drive, hills, tunnels and camera collision. Record before/after time and maximum angular velocity. Classic camera must remain unchanged.
 
 ## M3 — Magnetic reticle / aim assist setting
+
+**Implementation status:** the Modernization menu now exposes Off / Low /
+Medium / High, independently of aim mode. Classic defaults to Off; Modern
+presets default to Medium. Existing Modern-preset settings without the new key
+migrate to Medium, while Classic/Custom settings without it migrate to Off.
+The old Modern Assisted snap/flick and unconditional friction are replaced by
+one adjustable system in both Modern aim modes, so they cannot stack. Free
+Aim uses 65% of the selected strength; Assisted uses the full strength. Off adds
+no magnetism or old assisted snap/flick. Mouse/keyboard are excluded; Android
+touch uses lighter tuning than physical pads.
+
+For supported on-foot instant-hit/shotgun weapons, the camera retains one
+hostile ped using a generation-checked pool handle; unsuccessful acquisition
+scans are rate-limited. It applies bounded camera
+attraction and friction only with clear camera, chest-to-muzzle and muzzle
+lines; an occluded target gets a short retention grace but no attraction. A
+lost target is not silently replaced until a fresh aim or deliberate strong
+stick input. Aim height follows the reticle within the body rather than forcing
+head-level aim to the torso. Scoped, heavy/area, vehicle, scripted, replay,
+Classic and disabled-control cases are excluded. Switch/handheld still lacks
+its underlying Modern OTS aiming path and therefore has no magnetism. The
+flamethrower's legacy area propagation remains an existing exception, not a
+claimed reticle/muzzle-parity fix. The code and host tests still require device
+gameplay validation and tuning. After initial user testing reported no felt
+magnetism, ordinary stick input was separated from full-deflection override,
+sensitivity scaling was accounted for, the acquisition cone and High response
+were increased, and peds actively attacking the player via `m_pSeekTarget`
+were included. A subsequent user report revealed that `bIsPlayerFriend` starts
+true even for randomly spawned cops; unconditional rejection of the flag
+prevented acquiring them. The filter now follows the engine's mission-friend
+semantics while still requiring active hostility and excluding followers and
+protected targets. This fix still needs on-device validation; it deliberately
+excludes neutral bystanders.
 
 - Add **Aim Magnetism: Off / Low / Medium / High** to the Modernization menu and persisted Modern config; specify defaults explicitly (Classic preset Off; Modern preset Medium) and localize/fallback text. It is distinct from the existing Classic / Free / Assisted aim-mode choice: magnetism operates only during supported Modern aiming with an eligible input device, and Off is exactly the unmodified camera/aim path. Existing Assisted snap and friction must not stack twice; define how those features are scaled or replaced for each value.
 - Extend the existing target selection rather than scan every ped multiple times per frame. Candidate must be alive, eligible, in weapon range, near the reticle and visible to camera **and** not blocked from the muzzle. Use stable pool/reference handles with invalidation; no persistent raw dangling pointers. Include moving targets, friendly/mission targets, camera occlusion and target deletion. Do not acquire random bystanders just because they are closer.

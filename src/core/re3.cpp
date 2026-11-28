@@ -590,6 +590,9 @@ bool LoadINISettings()
 	ReadIniIfExists("Modern", "FastInteriorFades", &CModernConfig::m_bFastInteriorFades);
 	ReadIniIfExists("Modern", "ModernVehicleCam", &CModernConfig::m_bModernVehicleCam);
 	ReadIniIfExists("Modern", "AimMode", &CModernConfig::m_nAimMode);
+	if (!ReadIniIfExists("Modern", "AimMagnetism", &CModernConfig::m_nAimMagnetism))
+		CModernConfig::m_nAimMagnetism = CModernConfig::m_nPreset == MODERN_PRESET_MODERN ?
+			MODERN_MAGNETISM_MEDIUM : MODERN_MAGNETISM_OFF;
 	ReadIniIfExists("Modern", "RightShoulder", &CModernConfig::m_bRightShoulder);
 	ReadIniIfExists("Modern", "WeaponRadioWheels", &CModernConfig::m_bWeaponRadioWheels);
 	ReadIniIfExists("Modern", "VehCamAutoCenterDelay", &CModernConfig::m_fVehCamAutoCenterDelay);
@@ -726,6 +729,7 @@ void SaveINISettings()
 	StoreIni("Modern", "FastInteriorFades", CModernConfig::m_bFastInteriorFades);
 	StoreIni("Modern", "ModernVehicleCam", CModernConfig::m_bModernVehicleCam);
 	StoreIni("Modern", "AimMode", CModernConfig::m_nAimMode);
+	StoreIni("Modern", "AimMagnetism", CModernConfig::m_nAimMagnetism);
 	StoreIni("Modern", "RightShoulder", CModernConfig::m_bRightShoulder);
 	StoreIni("Modern", "WeaponRadioWheels", CModernConfig::m_bWeaponRadioWheels);
 	StoreIni("Modern", "VehCamAutoCenterDelay", CModernConfig::m_fVehCamAutoCenterDelay);
